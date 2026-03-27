@@ -102,22 +102,23 @@ export const projects: Project[] = [
   {
     id: "transportation-platform",
     title: "Full-Stack Transportation Platform",
-    subtitle: "Microservices with ML-Powered Support",
+    subtitle: "Microservices with ML-Powered Support & AI Chatbot",
     description:
-      "Enterprise-grade ride-booking platform with microservices architecture, real-time processing, and intelligent support triaging.",
+      "Enterprise-grade vehicle rental and ride-booking platform with Spring Boot microservices, Next.js frontend, 30+ REST APIs, JWT/RBAC authentication, NLP-based support triaging, and an AI-powered chatbot.",
     problem:
-      "Building a scalable ride-booking system that handles concurrent transactions while reducing manual support overhead through intelligent automation.",
+      "Building a scalable ride-booking system that handles concurrent transactions with secure authentication while reducing manual support overhead through intelligent automation.",
     solution:
-      "Constructed a microservices backend with Java Spring Boot, 30+ REST APIs secured via JWT/RBAC, and an NLP-based ML pipeline for automated support ticket triaging with sentiment analysis.",
+      "Constructed a microservices backend with Java Spring Boot, 30+ REST APIs secured via JWT/RBAC, payment workflows, and Next.js frontend. Built an NLP-based ML pipeline for automated support ticket triaging with sentiment analysis and a neural network-powered chatbot for intelligent user support.",
     impact: [
       "Sub-200ms API response times via connection pooling and indexing",
       "40% reduction in manual support tickets through ML triaging",
-      "25% lower request latency with PostgreSQL caching strategies",
+      "78% accuracy in chatbot intent classification using Neural Networks",
       "Concurrent ride-booking with transactional consistency",
     ],
     techStack: [
       "Java",
       "Spring Boot",
+      "Next.js",
       "PostgreSQL",
       "Python",
       "NLP",
@@ -125,6 +126,7 @@ export const projects: Project[] = [
       "Redis",
     ],
     categories: ["backend", "fullstack", "ai"],
+    github: "https://github.com/malav-250/transportation-platform",
     featured: true,
   },
 
@@ -216,33 +218,6 @@ export const projects: Project[] = [
   },
 
   // ── FULL-STACK PROJECTS ────────────────────────────────────────
-  {
-    id: "uhaul-clone",
-    title: "Vehicle Rental Booking Platform",
-    subtitle: "Full-Stack with AI Chatbot Integration",
-    description:
-      "Comprehensive vehicle rental booking system with secure authentication, payment workflows, and an AI-powered support chatbot.",
-    problem:
-      "Creating a seamless end-to-end vehicle rental experience with secure booking flows while reducing support overhead for common customer queries.",
-    solution:
-      "Developed a full-stack platform with Spring Boot backend and Next.js frontend, implementing JWT authentication, role-based authorization (RBAC), and payment workflows. Integrated a neural network-powered chatbot for intelligent user support.",
-    impact: [
-      "Secure JWT authentication with role-based access control",
-      "78% accuracy in chatbot intent classification using Neural Networks",
-      "Seamless booking and payment workflow end-to-end",
-      "Significant reduction in support queries via AI chatbot",
-    ],
-    techStack: [
-      "Java",
-      "Spring Boot",
-      "Next.js",
-      "JWT",
-      "Neural Networks",
-      "PostgreSQL",
-    ],
-    categories: ["fullstack", "backend", "ai"],
-    featured: false,
-  },
   {
     id: "healthcare-platform",
     title: "Healthcare Management Platform",
