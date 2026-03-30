@@ -47,9 +47,8 @@ export default function Contact() {
             Let&apos;s connect.
           </h3>
           <p className="text-text-secondary text-lg mb-14 leading-relaxed">
-            Open to opportunities in software engineering, backend systems, cloud
-            infrastructure, and ML. Let&apos;s talk about how I can contribute to
-            your team.
+            Looking for backend and cloud engineering roles starting August 2026.
+            Let&apos;s talk about how I can contribute to your team.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 mb-14">

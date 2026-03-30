@@ -103,7 +103,7 @@ export default function Hero() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            Currently building at Crewasis — Open to SDE roles May 2026
+            Building at Crewasis — Open to backend/cloud roles Aug 2026
           </motion.div>
 
           {/* Headline with word-by-word reveal */}

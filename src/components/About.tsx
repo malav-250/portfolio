@@ -2,13 +2,13 @@
 
 import { useRef, MouseEvent } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { Server, Cloud, Brain } from "lucide-react";
+import { Server, Cloud, Database } from "lucide-react";
 import { aboutContent } from "@/data/portfolio";
 
 const iconMap: Record<string, React.ReactNode> = {
   server: <Server size={24} />,
   cloud: <Cloud size={24} />,
-  brain: <Brain size={24} />,
+  database: <Database size={24} />,
 };
 
 function SpotlightCard({
@@ -61,7 +61,7 @@ export default function About() {
             About
           </h2>
           <h3 className="text-3xl sm:text-5xl font-bold mb-6 tracking-tight">
-            Engineer who ships.
+            Backend engineer who ships.
           </h3>
           <p className="text-text-secondary max-w-2xl text-lg leading-relaxed mb-16">
             {aboutContent.description}

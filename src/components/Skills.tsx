@@ -2,7 +2,7 @@
 
 import { useRef, MouseEvent } from "react";
 import { motion } from "framer-motion";
-import { Code, Layers, Cloud, Database, Brain, Settings } from "lucide-react";
+import { Code, Layers, Cloud, Database, Shield } from "lucide-react";
 import { skills } from "@/data/portfolio";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -10,8 +10,7 @@ const iconMap: Record<string, React.ReactNode> = {
   layers: <Layers size={20} />,
   cloud: <Cloud size={20} />,
   database: <Database size={20} />,
-  brain: <Brain size={20} />,
-  settings: <Settings size={20} />,
+  shield: <Shield size={20} />,
 };
 
 function SkillCard({
@@ -86,8 +85,8 @@ export default function Skills() {
             Technical toolkit.
           </h3>
           <p className="text-text-secondary max-w-xl text-lg mb-16">
-            Full-stack capabilities spanning backend systems, cloud
-            infrastructure, and machine learning.
+            Backend systems, cloud infrastructure, and the tooling to ship them
+            reliably.
           </p>
         </motion.div>
 

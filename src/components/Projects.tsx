@@ -383,10 +383,11 @@ export default function Projects() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const featuredProjects = projects.filter((p) => p.featured);
+  const nonFeatured = projects.filter((p) => !p.featured);
   const filteredProjects =
     activeFilter === "all"
-      ? projects
-      : projects.filter((p) => p.categories.includes(activeFilter));
+      ? nonFeatured
+      : nonFeatured.filter((p) => p.categories.includes(activeFilter));
 
   return (
     <section id="projects" className="py-32 relative">
@@ -404,8 +405,8 @@ export default function Projects() {
             What I&apos;ve built.
           </h3>
           <p className="text-text-secondary max-w-xl text-lg mb-12">
-            Production systems, cloud architectures, ML pipelines, and published
-            research — each solving real problems with measurable impact.
+            Backend services, cloud infrastructure, and distributed systems —
+            each with real architecture decisions and measurable outcomes.
           </p>
         </motion.div>
 
