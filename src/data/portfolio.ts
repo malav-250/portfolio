@@ -125,6 +125,39 @@ export const projects: Project[] = [
     featured: true,
   },
 
+  {
+    id: "distributed-task-queue",
+    title: "Distributed Task Queue",
+    subtitle: "Celery + RabbitMQ — Circuit Breakers, Observability, Terraform",
+    description:
+      "Production-grade distributed task queue processing asynchronous workloads (image transformation, PDF rendering, webhook dispatch) with FastAPI, Celery, and RabbitMQ. Includes fault-tolerant resilience patterns, full observability, and Terraform-based AWS deployment.",
+    problem:
+      "Async workloads like image processing and webhook delivery need reliable queue-based processing with retry logic, deduplication, and observability — without dropping messages under load.",
+    solution:
+      "Built a FastAPI service backed by Celery workers and RabbitMQ with exponential-backoff retries and dead-letter routing for zero message loss. Added per-client sliding-window rate limiting, Redis-backed circuit breakers, and idempotency-key deduplication. Provisioned Prometheus + Grafana dashboards and structured JSON logging with correlation-ID tracing. Containerized 8 services via Docker Compose and codified AWS deployment (ECS Fargate, RDS, ElastiCache) with Terraform.",
+    impact: [
+      "Zero message loss across 10K+ queued jobs via dead-letter routing",
+      "100% duplicate elimination with idempotency-key deduplication",
+      "Sub-50ms API response latency under concurrent load",
+      "8 containerized services with Prometheus/Grafana observability",
+    ],
+    techStack: [
+      "FastAPI",
+      "Celery",
+      "RabbitMQ",
+      "Redis",
+      "Prometheus",
+      "Grafana",
+      "Docker Compose",
+      "Terraform",
+      "AWS ECS Fargate",
+      "PostgreSQL",
+    ],
+    categories: ["backend", "cloud"],
+    github: "https://github.com/malav-250/distributed-task-queue",
+    featured: true,
+  },
+
   // ── OTHER PROJECTS ───────────────────────────────────────────
   {
     id: "healthcare-platform",
@@ -208,6 +241,7 @@ export const skills: SkillCategory[] = [
       "Spring Boot",
       "ASP.NET Core",
       "FastAPI",
+      "Celery",
       "Next.js",
       "Entity Framework",
     ],
@@ -216,9 +250,10 @@ export const skills: SkillCategory[] = [
     title: "Cloud & Infrastructure",
     icon: "cloud",
     skills: [
-      "AWS (EC2, S3, RDS, Lambda, SNS)",
+      "AWS (EC2, S3, RDS, Lambda, ECS Fargate)",
       "Docker",
       "Terraform",
+      "RabbitMQ",
       "GitHub Actions",
       "Azure DevOps",
       "Packer",
@@ -235,8 +270,9 @@ export const skills: SkillCategory[] = [
     skills: [
       "PyTest",
       "xUnit",
+      "Prometheus",
+      "Grafana",
       "CloudWatch",
-      "Weights & Biases",
       "Structured Logging",
     ],
   },
