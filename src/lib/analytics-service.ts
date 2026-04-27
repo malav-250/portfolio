@@ -177,38 +177,32 @@ export async function getTopPages(limit = 10): Promise<TopPage[]> {
 }
 
 export async function getResumeClickStats(): Promise<ResumeClickStats> {
-  const rows = await query<{ window: string; count: number }>(
+  // Single conditional-aggregation pass — avoids the reserved keyword "window"
+  // and is faster than UNION ALL + GROUP BY.
+  const rows = await query<{ last_7: number; last_30: number }>(
     `SELECT
-       window,
-       COUNT(*)::int AS count
-     FROM (
-       SELECT '7' AS window FROM events
-         WHERE event_type = 'resume_click'
-           AND occurred_at >= NOW() - INTERVAL '7 days'
-       UNION ALL
-       SELECT '30' AS window FROM events
-         WHERE event_type = 'resume_click'
-           AND occurred_at >= NOW() - INTERVAL '30 days'
-     ) t
-     GROUP BY window`
+       COUNT(*) FILTER (WHERE occurred_at >= NOW() - INTERVAL '7 days')::int  AS last_7,
+       COUNT(*) FILTER (WHERE occurred_at >= NOW() - INTERVAL '30 days')::int AS last_30
+     FROM events
+     WHERE event_type = 'resume_click'`
   );
-  const stats: ResumeClickStats = { last7Days: 0, last30Days: 0 };
-  for (const r of rows) {
-    if (r.window === "7") stats.last7Days = r.count;
-    if (r.window === "30") stats.last30Days = r.count;
-  }
-  return stats;
+  return {
+    last7Days: rows[0]?.last_7 ?? 0,
+    last30Days: rows[0]?.last_30 ?? 0,
+  };
 }
 
 export async function getUniqueVisitorsByDay(
   days = 14
 ): Promise<UniqueVisitorsByDay[]> {
+  // Multiplying INTERVAL '1 day' by an integer is the cleanest way to
+  // build a parameterized interval — no string concat, no cast gymnastics.
   const rows = await query<UniqueVisitorsByDay>(
     `SELECT
        to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS date,
        COUNT(DISTINCT id)::int AS count
      FROM visitors
-     WHERE created_at >= NOW() - ($1::int || ' days')::INTERVAL
+     WHERE created_at >= NOW() - (INTERVAL '1 day' * $1::int)
      GROUP BY 1
      ORDER BY 1 ASC`,
     [days]

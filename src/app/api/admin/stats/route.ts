@@ -60,7 +60,13 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[/api/admin/stats]", err);
+    // Log full error server-side so we can debug from Vercel logs;
+    // never leak details to the client.
+    console.error(
+      "[/api/admin/stats]",
+      err instanceof Error ? `${err.name}: ${err.message}` : err,
+      err instanceof Error ? err.stack : undefined
+    );
     return NextResponse.json(
       { success: false, error: "internal_error" },
       { status: 500 }
