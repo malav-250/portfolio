@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail, FileText } from "lucide-react";
 import { heroContent, personalInfo } from "@/data/portfolio";
+import { trackEvent } from "@/hooks/useAnalytics";
 import ParticleField from "./ParticleField";
 import GridSpotlight from "./GridSpotlight";
 
@@ -148,6 +149,7 @@ export default function Hero() {
             </a>
             <a
               href="#contact"
+              onClick={() => trackEvent("contact_click", { source: "hero_cta" })}
               className="px-7 py-3.5 border border-border-light text-text-primary rounded-xl hover:bg-surface-light/80 hover:border-accent/30 transition-all duration-300 text-sm font-medium"
             >
               Get in Touch
@@ -180,6 +182,13 @@ export default function Hero() {
                   href={link.href}
                   target={link.href.startsWith("mailto") ? undefined : "_blank"}
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    if (link.label === "Resume") {
+                      trackEvent("resume_click", { source: "hero" });
+                    } else if (link.label === "Email") {
+                      trackEvent("contact_click", { source: "hero", channel: "email" });
+                    }
+                  }}
                   className="p-2.5 rounded-xl border border-border hover:border-accent/40 hover:bg-accent/5 text-text-secondary hover:text-accent transition-all duration-300"
                   aria-label={link.label}
                 >

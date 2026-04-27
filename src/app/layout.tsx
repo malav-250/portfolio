@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,7 +42,14 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {/* Analytics: behavioral component, renders nothing.
+            Suspense boundary required because useAnalytics calls usePathname(). */}
+        <Suspense fallback={null}>
+          <AnalyticsProvider />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

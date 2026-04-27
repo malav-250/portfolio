@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { projects, projectCategories, type Project } from "@/data/portfolio";
+import { trackEvent } from "@/hooks/useAnalytics";
 
 /* ── Badge Styles ─────────────────────────────────────────────── */
 const badgeStyles: Record<
@@ -173,6 +174,13 @@ function ProjectModal({
               href={project.github}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                trackEvent("project_click", {
+                  projectSlug: project.id,
+                  surface: "modal",
+                  link: "github",
+                })
+              }
               className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
             >
               <Github size={16} />
@@ -184,6 +192,13 @@ function ProjectModal({
               href={project.live}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                trackEvent("project_click", {
+                  projectSlug: project.id,
+                  surface: "modal",
+                  link: "live",
+                })
+              }
               className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
             >
               <ExternalLink size={16} />
@@ -219,7 +234,10 @@ function FeaturedProjectCard({
         onMouseLeave={tilt.onMouseLeave}
         className="card-spotlight glass-card rounded-2xl p-8 sm:p-10 glow-hover relative overflow-hidden group cursor-pointer"
         style={{ transition: "transform 0.15s ease" }}
-        onClick={() => onSelect(project)}
+        onClick={() => {
+          trackEvent("project_click", { projectSlug: project.id, surface: "card" });
+          onSelect(project);
+        }}
       >
         <div className="absolute top-0 right-0 w-80 h-80 bg-accent/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
         <div className="relative">
@@ -305,7 +323,10 @@ function ProjectCard({
         onMouseLeave={tilt.onMouseLeave}
         className="card-spotlight glass-card rounded-2xl p-6 glow-hover flex flex-col h-full cursor-pointer group"
         style={{ transition: "transform 0.15s ease" }}
-        onClick={() => onSelect(project)}
+        onClick={() => {
+          trackEvent("project_click", { projectSlug: project.id, surface: "card" });
+          onSelect(project);
+        }}
       >
         {project.badge && badgeStyles[project.badge] && (
           <div className="flex items-center gap-1.5 mb-3">

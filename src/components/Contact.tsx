@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Mail, Github, Linkedin, MapPin, ArrowUpRight } from "lucide-react";
 import { personalInfo } from "@/data/portfolio";
+import { trackEvent } from "@/hooks/useAnalytics";
 
 const contactLinks = [
   {
@@ -58,6 +59,12 @@ export default function Contact() {
                 href={link.href}
                 target={link.external ? "_blank" : undefined}
                 rel={link.external ? "noopener noreferrer" : undefined}
+                onClick={() =>
+                  trackEvent("contact_click", {
+                    source: "contact_section",
+                    channel: link.label.toLowerCase(),
+                  })
+                }
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -105,6 +112,12 @@ export default function Contact() {
 
           <motion.a
             href={`mailto:${personalInfo.email}`}
+            onClick={() =>
+              trackEvent("contact_click", {
+                source: "contact_cta",
+                channel: "email",
+              })
+            }
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import { trackEvent } from "@/hooks/useAnalytics";
 
 const navLinks = [
   { href: "#about", label: "About" },
@@ -105,6 +106,7 @@ export default function Navbar() {
               href="/resume.pdf"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent("resume_click", { source: "navbar" })}
               className="ml-4 text-sm px-5 py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 hover:border-accent/50 transition-all duration-300"
             >
               Resume
@@ -153,6 +155,7 @@ export default function Navbar() {
                   href="/resume.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackEvent("resume_click", { source: "navbar_mobile" })}
                   className="text-sm text-accent py-2 px-3"
                 >
                   Resume
