@@ -1,6 +1,6 @@
 # Malav Gajera — Portfolio
 
-Personal portfolio at [malavgajera.com](https://malavgajera.com).
+Personal portfolio at [malavgajera.is-a.dev](https://malavgajera.is-a.dev).
 
 Built with Next.js 15 (App Router), React 19, Tailwind v4, and Framer Motion.
 
