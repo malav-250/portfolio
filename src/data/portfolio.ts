@@ -207,9 +207,236 @@ export const projects: Project[] = [
       "ETL",
       "Weights & Biases",
     ],
-    categories: ["backend"],
+    categories: ["ai", "backend"],
     github:
       "https://github.com/malav-250/Real-Time-Parallel-Shoplifting-Detection-using-Multimodal-AI",
+    featured: false,
+  },
+
+  // ── HACKATHONS ──────────────────────────────────────────────────
+  {
+    id: "rare-disease-hackathon",
+    title: "RareSense — Rare Disease Diagnostic Tool",
+    subtitle: "Harvard Rare Disease Hackathon 2025",
+    description:
+      "AI-powered diagnostic tool using phenotype-driven disease matching with the Human Phenotype Ontology (HPO) to help healthcare professionals identify rare genetic disorders.",
+    problem:
+      "Rare diseases affect millions but are notoriously difficult to diagnose, with patients often waiting years for an accurate diagnosis due to the vast number of potential conditions.",
+    solution:
+      "Built a Streamlit-based web application that allows healthcare professionals to input patient phenotypes and match them against known genetic disorders using the HPO database, providing ranked differential diagnoses.",
+    impact: [
+      "Phenotype-driven matching across known genetic disorders",
+      "Built at Harvard Rare Disease Hackathon 2025",
+      "Interactive Streamlit UI for healthcare professionals",
+      "Leverages Human Phenotype Ontology for accurate matching",
+    ],
+    techStack: [
+      "Python",
+      "Streamlit",
+      "HPO",
+      "Bioinformatics",
+      "Data Science",
+    ],
+    categories: ["ai", "fullstack"],
+    github: "https://github.com/malav-250/Harvard-Rare-Disease-Hackathon-2025",
+    featured: false,
+    badge: "Hackathon Winner",
+  },
+  {
+    id: "doc-compliance-tool",
+    title: "AI Document Compliance Tool",
+    subtitle: "MINeD 2025 Hackathon — 3rd Place ($200)",
+    description:
+      "AI-powered tool that automates research paper compliance checks using OCR and image processing, reducing rejection rates for academic submissions.",
+    problem:
+      "Research paper submissions frequently get rejected due to formatting and compliance issues, wasting researchers' time and delaying publication.",
+    solution:
+      "Engineered a Python-based compliance assessment tool using Streamlit for the UI, OpenCV for advanced image processing, and PyTesseract for OCR to automatically scan and validate document formatting against submission guidelines.",
+    impact: [
+      "40% reduction in research paper rejection rates",
+      "40% boost in document clarity and formatting compliance",
+      "Won 3rd Place at MINeD 2025 Hackathon ($200 prize)",
+      "Streamlined research workflows saving significant manual effort",
+    ],
+    techStack: [
+      "Python",
+      "Streamlit",
+      "OpenCV",
+      "PyTesseract",
+      "OCR",
+      "Image Processing",
+    ],
+    categories: ["ai", "fullstack"],
+    featured: false,
+    badge: "Hackathon Winner",
+  },
+
+  // ── RESEARCH ────────────────────────────────────────────────────
+  {
+    id: "lung-sound-detection",
+    title: "Lung Sound Disease Detection",
+    subtitle: "Deep Learning Research with EfficientNet + Attention",
+    description:
+      "Researched and implemented a deep learning system using EfficientNet with attention mechanisms to automatically diagnose respiratory diseases from lung sound audio recordings.",
+    problem:
+      "Lung sounds carry subtle variations that even experienced doctors can miss, leading to delayed or inaccurate diagnoses of respiratory conditions.",
+    solution:
+      "Researched and built an EfficientNet-B0 model enhanced with attention mechanisms, trained on the ICBHI 2017 dataset. Implemented bandpass Butterworth filtering for noise removal, audio data augmentation, and mel spectrogram conversion as preprocessing pipeline for the deep learning model.",
+    impact: [
+      "Achieved 99.82% validation accuracy with EfficientNet-B0 + attention",
+      "Built end-to-end audio preprocessing and classification pipeline",
+      "99.82% precision, recall, and F1-score across disease classes",
+      "Implemented state-of-the-art attention mechanisms for audio analysis",
+    ],
+    techStack: [
+      "Python",
+      "TensorFlow",
+      "EfficientNet",
+      "Attention Mechanisms",
+      "Mel Spectrograms",
+      "ICBHI Dataset",
+    ],
+    categories: ["ai", "research"],
+    featured: false,
+    badge: "Research",
+  },
+  {
+    id: "v2x-collision-avoidance",
+    title: "Vehicle Collision Avoidance System",
+    subtitle: "Reinforcement Learning + V2X Communication",
+    description:
+      "Research on intelligent collision avoidance using Vehicle-to-Everything (V2X) communication and reinforcement learning for autonomous decision-making.",
+    problem:
+      "Traditional collision avoidance systems rely on limited sensor data. V2X communication can expand awareness but requires intelligent decision-making algorithms.",
+    solution:
+      "Built a collision avoidance framework using V2X communication protocols with reinforcement learning algorithms for optimized real-time decision-making. Tested and validated in SUMO traffic simulator for realistic traffic scenarios.",
+    impact: [
+      "RL-optimized decision-making for real-time collision avoidance",
+      "Tested in SUMO simulator with real-world traffic patterns",
+      "V2X communication for expanded vehicle situational awareness",
+      "Framework applicable to autonomous driving research",
+    ],
+    techStack: [
+      "Python",
+      "Reinforcement Learning",
+      "V2X",
+      "SUMO Simulator",
+      "Deep Learning",
+    ],
+    categories: ["ai", "research"],
+    featured: false,
+    badge: "Research",
+  },
+
+  // ── ML & AI ─────────────────────────────────────────────────────
+  {
+    id: "quora-duplicate-detection",
+    title: "Quora Duplicate Question Detection",
+    subtitle: "BERT-Powered NLP Classification",
+    description:
+      "Deep learning model using BERT to identify semantically duplicate questions on Quora, outperforming traditional ML approaches.",
+    problem:
+      "Quora's platform suffers from duplicate questions that fragment knowledge and reduce answer quality for users searching for information.",
+    solution:
+      "Built a deep learning classification model leveraging BERT (Bidirectional Encoder Representations from Transformers) for semantic similarity detection between question pairs, with fine-tuning on the Quora Question Pairs dataset.",
+    impact: [
+      "89.28% validation accuracy on duplicate detection",
+      "Outperformed traditional ML models by 10%",
+      "Effective semantic similarity using BERT embeddings",
+      "Scalable inference pipeline for real-time classification",
+    ],
+    techStack: [
+      "Python",
+      "BERT",
+      "Transformers",
+      "PyTorch",
+      "NLP",
+      "Hugging Face",
+    ],
+    categories: ["ai"],
+    featured: false,
+  },
+  {
+    id: "deepgram-voice-agent",
+    title: "AI Voice Agent",
+    subtitle: "Real-Time Conversational AI with Deepgram + Twilio",
+    description:
+      "AI-powered voice agent integrating speech-to-text, text-to-speech, and LLM capabilities for real-time, low-latency phone conversations.",
+    problem:
+      "Building real-time voice AI for customer service requires seamless integration of STT, TTS, and LLM with minimal latency for natural conversations.",
+    solution:
+      "Built a voice agent using Deepgram Voice Agent API and Twilio, combining speech-to-text, text-to-speech, and LLM inference into a unified pipeline for real-time phone conversations with advanced call features.",
+    impact: [
+      "Real-time, low-latency voice conversations via Twilio",
+      "Integrated STT + TTS + LLM in a unified pipeline",
+      "Applicable to customer service, healthcare, and more",
+      "Advanced call features for production use cases",
+    ],
+    techStack: [
+      "Python",
+      "Deepgram API",
+      "Twilio",
+      "LLM",
+      "Speech-to-Text",
+      "Text-to-Speech",
+    ],
+    categories: ["ai", "backend"],
+    github: "https://github.com/malav-250/deepgram-voice-agent",
+    featured: false,
+  },
+  {
+    id: "finance-ai-agent",
+    title: "Finance AI Agent",
+    subtitle: "AI-Powered Stock Analysis & Market Insights",
+    description:
+      "Autonomous AI agent that provides real-time stock data analysis and market insights using LLM-powered reasoning.",
+    problem:
+      "Retail investors need quick, intelligent analysis of stock data and market trends without manually sifting through complex financial data.",
+    solution:
+      "Built an AI-powered financial analysis agent that fetches real-time stock data and provides intelligent market insights using LLM reasoning for informed investment analysis.",
+    impact: [
+      "Real-time stock data fetching and analysis",
+      "LLM-powered reasoning for market insights",
+      "Autonomous agent architecture for financial tasks",
+      "Clean Python implementation for extensibility",
+    ],
+    techStack: [
+      "Python",
+      "LLM",
+      "Financial APIs",
+      "AI Agents",
+    ],
+    categories: ["ai"],
+    github: "https://github.com/malav-250/finance-ai-agent",
+    featured: false,
+  },
+
+  // ── CREATIVE ────────────────────────────────────────────────────
+  {
+    id: "air-chords",
+    title: "Air Chords",
+    subtitle: "Vision-Based Musical Interface with Hand Gestures",
+    description:
+      "Real-time computer vision application that transforms hand gestures into musical chords using OpenCV and MIDI synthesis.",
+    problem:
+      "Traditional musical instruments have steep learning curves. Gesture-based interfaces can make music creation more accessible and interactive.",
+    solution:
+      "Built a real-time vision-based musical interface using Python and OpenCV for hand gesture recognition, mapping detected gestures to MIDI chord synthesis for an intuitive, touchless musical experience.",
+    impact: [
+      "Real-time hand gesture recognition via OpenCV",
+      "Gesture-to-MIDI chord mapping for touchless music creation",
+      "Low-latency computer vision pipeline for responsive interaction",
+      "Creative intersection of computer vision and music technology",
+    ],
+    techStack: [
+      "Python",
+      "OpenCV",
+      "MIDI",
+      "Computer Vision",
+      "Real-Time Processing",
+    ],
+    categories: ["ai"],
+    github: "https://github.com/malav-250/Air-Chords",
     featured: false,
   },
 ];
@@ -218,6 +445,9 @@ export const projectCategories = [
   { id: "all", label: "All Projects" },
   { id: "backend", label: "Backend" },
   { id: "cloud", label: "Cloud & DevOps" },
+  { id: "ai", label: "AI / ML" },
+  { id: "fullstack", label: "Full Stack" },
+  { id: "research", label: "Research" },
 ];
 
 export interface SkillCategory {
@@ -273,6 +503,20 @@ export const skills: SkillCategory[] = [
       "Grafana",
       "CloudWatch",
       "Structured Logging",
+    ],
+  },
+  {
+    title: "AI & ML",
+    icon: "brain",
+    skills: [
+      "PyTorch",
+      "TensorFlow",
+      "BERT / Transformers",
+      "Hugging Face",
+      "OpenCV",
+      "Distributed Training (DDP)",
+      "NLP",
+      "Streamlit",
     ],
   },
 ];

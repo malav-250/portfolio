@@ -2,7 +2,7 @@
 
 import { useRef, MouseEvent } from "react";
 import { motion } from "framer-motion";
-import { Code, Layers, Cloud, Database, Shield } from "lucide-react";
+import { Code, Layers, Cloud, Database, Shield, Brain } from "lucide-react";
 import { skills } from "@/data/portfolio";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -11,6 +11,7 @@ const iconMap: Record<string, React.ReactNode> = {
   cloud: <Cloud size={20} />,
   database: <Database size={20} />,
   shield: <Shield size={20} />,
+  brain: <Brain size={20} />,
 };
 
 function SkillCard({
