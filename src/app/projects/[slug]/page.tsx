@@ -67,9 +67,36 @@ export default async function ProjectPage({
   const project = projects.find((p) => p.id === slug);
   if (!project) notFound();
 
+  const ogImage = PROJECT_OG_IMAGES[slug] ?? "/og/portfolio.png";
+
+  // SoftwareSourceCode + CreativeWork JSON-LD for project case studies.
+  // Helps Google surface case-study pages for queries like
+  // "<technology> portfolio project" and link projects to their repos.
+  const projectSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    name: project.title,
+    description: project.description,
+    abstract: project.subtitle,
+    image: `https://malavgajera.is-a.dev${ogImage}`,
+    url: `https://malavgajera.is-a.dev/projects/${project.id}`,
+    codeRepository: project.github ?? undefined,
+    programmingLanguage: project.techStack,
+    keywords: project.techStack.join(", "),
+    author: {
+      "@type": "Person",
+      name: "Malav Gajera",
+      url: "https://malavgajera.is-a.dev",
+    },
+  };
+
   return (
     <>
       <CursorGlow />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(projectSchema) }}
+      />
       <CaseStudyView project={project} />
       <Footer />
     </>
