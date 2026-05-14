@@ -97,19 +97,47 @@ export const projects: Project[] = [
     featured: true,
   },
   {
-    id: "cloud-native-app",
-    title: "Cloud Infrastructure Platform",
-    subtitle: "Full AWS Stack — Terraform IaC, Serverless, CI/CD",
+    id: "voice-agent",
+    title: "Real-Time AI Voice Agent",
+    subtitle: "Sub-Second Phone Conversations — Streaming STT + LLM + TTS",
     description:
-      "Production-grade cloud-native application spanning 3 repositories: a FastAPI web service with user/product management and S3 image storage, Terraform IaC for full AWS infrastructure, and serverless Lambda functions for event-driven email verification.",
+      "Production voice agent that handles real phone calls with sub-second response latency. Composes Deepgram STT/TTS with an LLM router into a streaming pipeline so the agent starts replying before the caller has finished speaking.",
     problem:
-      "Needed a highly available web application with automated infrastructure provisioning, event-driven serverless workflows, and zero-downtime CI/CD deployments.",
+      "Real-time voice AI lives or dies on latency: every 200ms past a turn-taking threshold feels like an awkward pause. Naive STT → LLM → TTS pipelines serialize three slow systems and blow the budget on the first sentence.",
     solution:
-      "Built a FastAPI REST API with PostgreSQL (RDS) and S3 image storage, deployed on custom Packer AMIs. Provisioned the entire AWS stack with Terraform — VPC across 3 AZs, Auto Scaling Groups, ALB with SSL/TLS, RDS in private subnets, and IAM role-based security. Implemented serverless email verification with Lambda triggered by SNS, storing tokens in DynamoDB and sending via SendGrid.",
+      "Built a streaming pipeline over Twilio Media Streams (bidirectional WebSocket audio): Deepgram's STT emits partial transcripts as the caller speaks, an interrupt-aware router commits to a response once the utterance stabilizes, and TTS chunks stream back as the LLM token-streams. Barge-in support lets the user cut the agent off mid-sentence — the router drops in-flight TTS and resets to listening.",
     impact: [
-      "Multi-AZ VPC with Auto Scaling, ALB, and private-subnet RDS",
-      "Terraform IaC managing all infrastructure across 3 repos",
-      "Zero-downtime CI/CD: PR validation, AMI build, rolling deploy",
+      "Sub-second perceived latency via end-to-end streaming (no full STT→LLM→TTS wait)",
+      "Barge-in support — caller can interrupt the agent mid-sentence",
+      "Interrupt-aware router discards stale partial transcripts",
+      "Twilio Media Streams + WebSocket for full-duplex audio",
+    ],
+    techStack: [
+      "Python",
+      "Deepgram",
+      "Twilio Media Streams",
+      "WebSocket",
+      "LLM",
+      "Streaming",
+    ],
+    categories: ["ai", "backend"],
+    github: "https://github.com/malav-250/deepgram-voice-agent",
+    featured: true,
+  },
+  {
+    id: "cloud-native-app",
+    title: "Resilient Cloud Deployment Platform",
+    subtitle: "Full AWS Stack — Terraform IaC, Multi-AZ, Blue-Green CI/CD",
+    description:
+      "Production-grade cloud platform spanning 3 repositories: a FastAPI web service, Terraform IaC for the full AWS stack, and serverless Lambda functions for event-driven email verification. Designed to survive an AZ outage and ship via PR-triggered rolling deploys.",
+    problem:
+      "Building a real production deployment surface — not a toy demo — means handling the hard parts: AZ failure, blue-green cutover, private-subnet databases, and IaC that you can hand off without a runbook.",
+    solution:
+      "FastAPI app on custom Packer AMIs deployed to an Auto Scaling Group spread across 3 AZs behind an ALB with SSL/TLS. RDS in private subnets reachable only from the app tier. Serverless email verification: SNS triggers Lambda, which writes tokens to DynamoDB and dispatches via SendGrid. Entire stack codified in Terraform — VPC, ASG, ALB, RDS, IAM roles. GitHub Actions handles PR validation, AMI bake, and rolling replacement.",
+    impact: [
+      "Multi-AZ VPC across 3 zones with Auto Scaling + ALB",
+      "Terraform IaC managing every resource across 3 repos",
+      "Zero-downtime CI/CD: PR validation → AMI bake → rolling deploy",
       "Serverless email flow: SNS → Lambda → DynamoDB → SendGrid",
     ],
     techStack: [
@@ -131,25 +159,25 @@ export const projects: Project[] = [
   {
     id: "transportation-platform",
     title: "Vehicle Rental Microservices Platform",
-    subtitle: "Spring Boot Backend — 30+ APIs, JWT/RBAC, Redis Caching",
+    subtitle: "Spring Boot — Concurrent Booking with Transactional Locks",
     description:
-      "Backend-heavy vehicle rental and ride-booking platform built with Spring Boot microservices, 30+ REST APIs, JWT/RBAC authentication, Redis caching, and a Next.js frontend.",
+      "Ride-booking platform built on Spring Boot microservices. The interesting problem: prevent double-booking when multiple users hit checkout for the same vehicle in the same second. Solved with row-level locking on availability + Redis caching for high-read paths.",
     problem:
-      "Building a ride-booking system that handles concurrent transactions with secure role-based access, payment workflows, and low-latency API responses.",
+      "Ride-booking platforms face a fundamental race condition — two users at checkout for the same vehicle. Naive implementations either double-book and lose customer trust, or serialize every booking and kill throughput. Both are unacceptable.",
     solution:
-      "Built a microservices backend with Java Spring Boot: 30+ REST APIs secured via JWT/RBAC, Redis caching for session and query data, PostgreSQL with connection pooling and indexing for sub-200ms responses, and transactional consistency for concurrent ride bookings.",
+      "Microservices in Java Spring Boot split along bounded contexts (auth, bookings, payments, notifications). Row-level pessimistic locks on the vehicle-availability table serialize only conflicting bookings — browsing and reads stay parallel. Redis caches hot read paths (vehicle listings, session state) so the database isn't hammered by traffic that doesn't need a write. JWT with role-scoped RBAC isolates customer, driver, and admin permissions. Next.js handles the frontend with server-side data fetching.",
     impact: [
-      "Sub-200ms API responses via Redis caching and query indexing",
-      "30+ REST APIs with JWT authentication and role-based access control",
-      "Concurrent ride-booking with transactional consistency",
-      "Separate microservices for auth, bookings, payments, and notifications",
+      "Concurrent ride-booking via row-level locks — no double-bookings under contention",
+      "Sub-200ms reads via Redis caching of vehicle listings and sessions",
+      "JWT/RBAC isolating customer, driver, and admin permission sets",
+      "Bounded-context microservices: auth, bookings, payments, notifications",
     ],
     techStack: [
       "Java",
       "Spring Boot",
       "PostgreSQL",
       "Redis",
-      "JWT",
+      "JWT/RBAC",
       "Next.js",
     ],
     categories: ["backend"],
@@ -244,62 +272,6 @@ export const projects: Project[] = [
     badge: "Hackathon Winner",
   },
 
-  // ── ML & AI ─────────────────────────────────────────────────────
-  {
-    id: "deepgram-voice-agent",
-    title: "AI Voice Agent",
-    subtitle: "Real-Time Conversational AI with Deepgram + Twilio",
-    description:
-      "AI-powered voice agent integrating speech-to-text, text-to-speech, and LLM capabilities for real-time, low-latency phone conversations.",
-    problem:
-      "Building real-time voice AI for customer service requires seamless integration of STT, TTS, and LLM with minimal latency for natural conversations.",
-    solution:
-      "Built a voice agent using Deepgram Voice Agent API and Twilio, combining speech-to-text, text-to-speech, and LLM inference into a unified pipeline for real-time phone conversations with advanced call features.",
-    impact: [
-      "Real-time, low-latency voice conversations via Twilio",
-      "Integrated STT + TTS + LLM in a unified pipeline",
-      "Applicable to customer service, healthcare, and more",
-      "Advanced call features for production use cases",
-    ],
-    techStack: [
-      "Python",
-      "Deepgram API",
-      "Twilio",
-      "LLM",
-      "Speech-to-Text",
-      "Text-to-Speech",
-    ],
-    categories: ["ai", "backend"],
-    github: "https://github.com/malav-250/deepgram-voice-agent",
-    featured: false,
-  },
-  {
-    id: "finance-ai-agent",
-    title: "Finance AI Agent",
-    subtitle: "AI-Powered Stock Analysis & Market Insights",
-    description:
-      "Autonomous AI agent that provides real-time stock data analysis and market insights using LLM-powered reasoning.",
-    problem:
-      "Retail investors need quick, intelligent analysis of stock data and market trends without manually sifting through complex financial data.",
-    solution:
-      "Built an AI-powered financial analysis agent that fetches real-time stock data and provides intelligent market insights using LLM reasoning for informed investment analysis.",
-    impact: [
-      "Real-time stock data fetching and analysis",
-      "LLM-powered reasoning for market insights",
-      "Autonomous agent architecture for financial tasks",
-      "Clean Python implementation for extensibility",
-    ],
-    techStack: [
-      "Python",
-      "LLM",
-      "Financial APIs",
-      "AI Agents",
-    ],
-    categories: ["ai"],
-    github: "https://github.com/malav-250/finance-ai-agent",
-    featured: false,
-  },
-
   // ── CREATIVE ────────────────────────────────────────────────────
   {
     id: "air-chords",
@@ -336,7 +308,6 @@ export const projectCategories = [
   { id: "cloud", label: "Cloud & DevOps" },
   { id: "ai", label: "AI / ML" },
   { id: "fullstack", label: "Full Stack" },
-  { id: "research", label: "Research" },
 ];
 
 export interface SkillCategory {
@@ -347,22 +318,27 @@ export interface SkillCategory {
 
 export const skills: SkillCategory[] = [
   {
-    title: "Primary Languages",
+    title: "Languages",
     icon: "code",
-    skills: ["Python", "Java", "C#", "SQL", "JavaScript", "Bash"],
+    skills: ["Python", "TypeScript", "Java", "C#", "SQL", "Bash"],
   },
   {
-    title: "Backend Frameworks",
+    title: "Backend & APIs",
     icon: "layers",
     skills: [
       "Django",
+      "FastAPI",
       "Spring Boot",
       "ASP.NET Core",
-      "FastAPI",
       "Celery",
-      "Next.js",
+      "Pydantic",
       "Entity Framework",
     ],
+  },
+  {
+    title: "Frontend",
+    icon: "monitor",
+    skills: ["Next.js", "React", "Tailwind CSS", "Framer Motion"],
   },
   {
     title: "Cloud & Infrastructure",
@@ -372,8 +348,6 @@ export const skills: SkillCategory[] = [
       "Docker",
       "Terraform",
       "RabbitMQ",
-      "GitHub Actions",
-      "Azure DevOps",
       "Packer",
     ],
   },
@@ -383,15 +357,15 @@ export const skills: SkillCategory[] = [
     skills: ["PostgreSQL", "MySQL", "MongoDB", "Redis", "DynamoDB"],
   },
   {
-    title: "Testing & Observability",
+    title: "Observability & Testing",
     icon: "shield",
     skills: [
-      "PyTest",
-      "xUnit",
       "Prometheus",
       "Grafana",
+      "OpenTelemetry",
       "CloudWatch",
-      "Structured Logging",
+      "PyTest",
+      "xUnit",
     ],
   },
   {
@@ -403,9 +377,19 @@ export const skills: SkillCategory[] = [
       "BERT / Transformers",
       "Hugging Face",
       "OpenCV",
-      "Distributed Training (DDP)",
       "NLP",
-      "Streamlit",
+    ],
+  },
+  {
+    title: "Tools",
+    icon: "wrench",
+    skills: [
+      "Cursor",
+      "Claude Code",
+      "Git",
+      "GitHub Actions",
+      "Azure DevOps",
+      "Postman",
     ],
   },
 ];

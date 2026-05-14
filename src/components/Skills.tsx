@@ -2,16 +2,18 @@
 
 import { useRef, MouseEvent } from "react";
 import { motion } from "framer-motion";
-import { Code, Layers, Cloud, Database, Shield, Brain } from "lucide-react";
+import { Code, Layers, Cloud, Database, Shield, Brain, Monitor, Wrench } from "lucide-react";
 import { skills } from "@/data/portfolio";
 
 const iconMap: Record<string, React.ReactNode> = {
   code: <Code size={20} />,
   layers: <Layers size={20} />,
+  monitor: <Monitor size={20} />,
   cloud: <Cloud size={20} />,
   database: <Database size={20} />,
   shield: <Shield size={20} />,
   brain: <Brain size={20} />,
+  wrench: <Wrench size={20} />,
 };
 
 function SkillCard({
@@ -91,7 +93,7 @@ export default function Skills() {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {skills.map((category, i) => (
             <SkillCard key={category.title} category={category} index={i} />
           ))}
