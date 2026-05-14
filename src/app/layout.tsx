@@ -33,11 +33,20 @@ export const metadata: Metadata = {
     url: "https://malavgajera.is-a.dev",
     siteName: "Malav Gajera",
     type: "website",
+    images: [
+      {
+        url: "/og/portfolio.png",
+        width: 1200,
+        height: 630,
+        alt: "Malav Gajera — Backend & Cloud Engineer",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Malav Gajera | Backend & Cloud Engineer",
     description: "MS @ Northeastern · SWE Co-op @ Crewasis · Open Jan 2027",
+    images: ["/og/portfolio.png"],
   },
 };
 

@@ -10,6 +10,16 @@ export function generateStaticParams() {
   return projects.map((p) => ({ slug: p.id }));
 }
 
+// Map each project to the page screenshot we fetched in /public/screenshots/.
+// These are used as Open Graph cards when the case study is shared on
+// LinkedIn / Twitter / Slack — recruiters see a real page render, not a
+// generic site icon.
+const PROJECT_OG_IMAGES: Record<string, string> = {
+  "distributed-task-queue": "/screenshots/task-queue.png",
+  "voice-agent": "/screenshots/voice-agent.png",
+  "cloud-native-app": "/screenshots/cloud-infra.png",
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -20,6 +30,7 @@ export async function generateMetadata({
   if (!project) {
     return { title: "Project not found" };
   }
+  const ogImage = PROJECT_OG_IMAGES[slug] ?? "/og/portfolio.png";
   return {
     title: `${project.title} | Malav Gajera`,
     description: project.description,
@@ -28,11 +39,18 @@ export async function generateMetadata({
       description: project.description,
       type: "article",
       url: `https://malavgajera.is-a.dev/projects/${project.id}`,
+      images: [
+        {
+          url: ogImage,
+          alt: `${project.title} case study`,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: project.title,
       description: project.subtitle,
+      images: [ogImage],
     },
     alternates: {
       canonical: `https://malavgajera.is-a.dev/projects/${project.id}`,

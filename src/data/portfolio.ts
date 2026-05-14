@@ -51,6 +51,15 @@ export interface ProjectDecision {
   body: string;
 }
 
+export interface ProjectScreenshot {
+  // Path relative to /public (e.g. "/screenshots/foo.png")
+  src: string;
+  alt: string;
+  caption?: string;
+  // Optional kind hint for layout (full-bleed dashboard vs. social card)
+  kind?: "dashboard" | "card" | "diagram";
+}
+
 export interface CaseStudy {
   // Reading time estimate ("4 min read")
   readingTime?: string;
@@ -67,6 +76,8 @@ export interface CaseStudy {
   outcomes: string[];
   // Honest list of what you'd improve / next steps
   nextSteps: string[];
+  // Optional screenshots: repo OG cards, running dashboards, etc.
+  screenshots?: ProjectScreenshot[];
 }
 
 export interface Project {
@@ -177,6 +188,14 @@ export const projects: Project[] = [
         "Add a Kafka topic for fan-out events (e.g. job completed → downstream consumers)",
         "Publish load-test results from k6 with p50/p95/p99 graphs as part of the README",
       ],
+      screenshots: [
+        {
+          src: "/screenshots/repo-task-queue.png",
+          alt: "GitHub repository preview for distributed-task-queue",
+          caption: "Source repo on GitHub — FastAPI, Celery, RabbitMQ, observability stack",
+          kind: "card",
+        },
+      ],
     },
   },
   {
@@ -260,6 +279,14 @@ export const projects: Project[] = [
         "Add a tool-calling layer (e.g. lookup calendar, book appointment) with structured-output validation",
         "Persist conversation transcripts + audio for offline review",
         "Test fallback paths: STT timeout, LLM provider outage, TTS quota exceeded",
+      ],
+      screenshots: [
+        {
+          src: "/screenshots/repo-voice-agent.png",
+          alt: "GitHub repository preview for deepgram-voice-agent",
+          caption: "Source repo on GitHub — streaming pipeline over Twilio Media Streams",
+          kind: "card",
+        },
       ],
     },
   },
@@ -371,6 +398,26 @@ export const projects: Project[] = [
         "Migrate to ECS Fargate to drop the AMI bake step and tighten the deploy loop",
         "Run a real GameDay: terminate an AZ via Chaos Engineering and measure recovery time",
         "Publish a cost teardown — $/month per traffic tier, separated by service",
+      ],
+      screenshots: [
+        {
+          src: "/screenshots/repo-cloud-webapp.png",
+          alt: "GitHub repository: FastAPI web service",
+          caption: "FastAPI web service (repo 1 of 3)",
+          kind: "card",
+        },
+        {
+          src: "/screenshots/repo-cloud-iac.png",
+          alt: "GitHub repository: Terraform infrastructure",
+          caption: "Terraform IaC for the full AWS stack (repo 2 of 3)",
+          kind: "card",
+        },
+        {
+          src: "/screenshots/repo-cloud-serverless.png",
+          alt: "GitHub repository: serverless email verification",
+          caption: "Lambda email verifier (repo 3 of 3)",
+          kind: "card",
+        },
       ],
     },
   },
