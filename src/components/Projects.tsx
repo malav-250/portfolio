@@ -2,6 +2,7 @@
 
 import { useState, useRef, MouseEvent, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   ExternalLink,
   Github,
@@ -9,7 +10,6 @@ import {
   Star,
   BookOpen,
   Trophy,
-  X,
   ArrowRight,
 } from "lucide-react";
 import { projects, projectCategories, type Project } from "@/data/portfolio";
@@ -50,176 +50,26 @@ function useTilt() {
   const onMouseLeave = useCallback(() => {
     const el = ref.current;
     if (el) {
-      el.style.transform = "perspective(800px) rotateY(0deg) rotateX(0deg) scale3d(1, 1, 1)";
+      el.style.transform =
+        "perspective(800px) rotateY(0deg) rotateX(0deg) scale3d(1, 1, 1)";
     }
   }, []);
 
   return { ref, onMouseMove, onMouseLeave };
 }
 
-/* ── Project Modal ────────────────────────────────────────────── */
-function ProjectModal({
-  project,
-  onClose,
-}: {
-  project: Project;
-  onClose: () => void;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-    >
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto glass-card rounded-2xl p-8 sm:p-10 z-10"
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-light transition-all"
-        >
-          <X size={18} />
-        </button>
-
-        {/* Badge */}
-        {project.badge && badgeStyles[project.badge] && (
-          <span
-            className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border mb-4 ${badgeStyles[project.badge].bg} ${badgeStyles[project.badge].text}`}
-          >
-            {badgeStyles[project.badge].icon}
-            {project.badge}
-          </span>
-        )}
-
-        <h3 className="text-2xl sm:text-3xl font-bold mb-2">
-          {project.title}
-        </h3>
-        <p className="text-accent/80 text-sm mb-6">{project.subtitle}</p>
-
-        <p className="text-text-secondary leading-relaxed mb-8">
-          {project.description}
-        </p>
-
-        {/* Problem / Solution */}
-        <div className="grid sm:grid-cols-2 gap-6 mb-8">
-          <div className="p-5 rounded-xl bg-surface-light/50 border border-border">
-            <h5 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-              Problem
-            </h5>
-            <p className="text-text-secondary text-sm leading-relaxed">
-              {project.problem}
-            </p>
-          </div>
-          <div className="p-5 rounded-xl bg-surface-light/50 border border-border">
-            <h5 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-              Solution
-            </h5>
-            <p className="text-text-secondary text-sm leading-relaxed">
-              {project.solution}
-            </p>
-          </div>
-        </div>
-
-        {/* Impact */}
-        <div className="mb-8">
-          <h5 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
-            Impact
-          </h5>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {project.impact.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-3 p-3 rounded-lg bg-accent/[0.03] border border-accent/10"
-              >
-                <ChevronRight
-                  size={14}
-                  className="text-accent mt-0.5 shrink-0"
-                />
-                <span className="text-sm text-text-secondary">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tech Stack */}
-        <div className="mb-8">
-          <h5 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-            Tech Stack
-          </h5>
-          <div className="flex flex-wrap gap-2">
-            {project.techStack.map((tech) => (
-              <span
-                key={tech}
-                className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20"
-              >
-                {tech}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Links */}
-        <div className="flex items-center gap-4 pt-4 border-t border-border">
-          {project.github && (
-            <a
-              href={project.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                trackEvent("project_click", {
-                  projectSlug: project.id,
-                  surface: "modal",
-                  link: "github",
-                })
-              }
-              className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
-            >
-              <Github size={16} />
-              View Code
-            </a>
-          )}
-          {project.live && (
-            <a
-              href={project.live}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                trackEvent("project_click", {
-                  projectSlug: project.id,
-                  surface: "modal",
-                  link: "live",
-                })
-              }
-              className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
-            >
-              <ExternalLink size={16} />
-              Live Demo
-            </a>
-          )}
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 /* ── Featured Project Card ────────────────────────────────────── */
-function FeaturedProjectCard({
-  project,
-  onSelect,
-}: {
-  project: Project;
-  onSelect: (p: Project) => void;
-}) {
+function FeaturedProjectCard({ project }: { project: Project }) {
   const tilt = useTilt();
+  const router = useRouter();
+
+  const openCaseStudy = () => {
+    trackEvent("project_click", {
+      projectSlug: project.id,
+      surface: "featured_card",
+    });
+    router.push(`/projects/${project.id}`);
+  };
 
   return (
     <motion.div
@@ -232,12 +82,18 @@ function FeaturedProjectCard({
         ref={tilt.ref}
         onMouseMove={tilt.onMouseMove}
         onMouseLeave={tilt.onMouseLeave}
-        className="card-spotlight glass-card rounded-2xl p-8 sm:p-10 glow-hover relative overflow-hidden group cursor-pointer"
-        style={{ transition: "transform 0.15s ease" }}
-        onClick={() => {
-          trackEvent("project_click", { projectSlug: project.id, surface: "card" });
-          onSelect(project);
+        onClick={openCaseStudy}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openCaseStudy();
+          }
         }}
+        role="link"
+        tabIndex={0}
+        aria-label={`View case study: ${project.title}`}
+        className="card-spotlight glass-card rounded-2xl p-8 sm:p-10 glow-hover relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/40"
+        style={{ transition: "transform 0.15s ease" }}
       >
         <div className="absolute top-0 right-0 w-80 h-80 bg-accent/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
         <div className="relative">
@@ -247,7 +103,9 @@ function FeaturedProjectCard({
               Featured Project
             </span>
           </div>
-          <h4 className="text-2xl sm:text-3xl font-bold mb-2">{project.title}</h4>
+          <h4 className="text-2xl sm:text-3xl font-bold mb-2">
+            {project.title}
+          </h4>
           <p className="text-accent/80 text-sm mb-5">{project.subtitle}</p>
           <p className="text-text-secondary leading-relaxed mb-8 max-w-3xl">
             {project.description}
@@ -282,15 +140,22 @@ function FeaturedProjectCard({
                 href={project.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  trackEvent("project_click", {
+                    projectSlug: project.id,
+                    surface: "featured_card",
+                    link: "github",
+                  });
+                }}
                 className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
               >
                 <Github size={16} />
                 Code
               </a>
             )}
-            <span className="flex items-center gap-1 text-sm text-accent group-hover:gap-2 transition-all">
-              View Details <ArrowRight size={14} />
+            <span className="flex items-center gap-1 text-sm text-accent group-hover:gap-2 transition-all font-medium">
+              View Case Study <ArrowRight size={14} />
             </span>
           </div>
         </div>
@@ -300,14 +165,17 @@ function FeaturedProjectCard({
 }
 
 /* ── Regular Project Card ─────────────────────────────────────── */
-function ProjectCard({
-  project,
-  onSelect,
-}: {
-  project: Project;
-  onSelect: (p: Project) => void;
-}) {
+function ProjectCard({ project }: { project: Project }) {
   const tilt = useTilt();
+  const router = useRouter();
+
+  const openCaseStudy = () => {
+    trackEvent("project_click", {
+      projectSlug: project.id,
+      surface: "grid_card",
+    });
+    router.push(`/projects/${project.id}`);
+  };
 
   return (
     <motion.div
@@ -321,12 +189,18 @@ function ProjectCard({
         ref={tilt.ref}
         onMouseMove={tilt.onMouseMove}
         onMouseLeave={tilt.onMouseLeave}
-        className="card-spotlight glass-card rounded-2xl p-6 glow-hover flex flex-col h-full cursor-pointer group"
-        style={{ transition: "transform 0.15s ease" }}
-        onClick={() => {
-          trackEvent("project_click", { projectSlug: project.id, surface: "card" });
-          onSelect(project);
+        onClick={openCaseStudy}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openCaseStudy();
+          }
         }}
+        role="link"
+        tabIndex={0}
+        aria-label={`View case study: ${project.title}`}
+        className="card-spotlight glass-card rounded-2xl p-6 glow-hover flex flex-col h-full cursor-pointer group focus:outline-none focus:ring-2 focus:ring-accent/40"
+        style={{ transition: "transform 0.15s ease" }}
       >
         {project.badge && badgeStyles[project.badge] && (
           <div className="flex items-center gap-1.5 mb-3">
@@ -369,7 +243,14 @@ function ProjectCard({
                 href={project.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  trackEvent("project_click", {
+                    projectSlug: project.id,
+                    surface: "grid_card",
+                    link: "github",
+                  });
+                }}
                 className="text-text-muted hover:text-text-primary transition-colors"
                 aria-label="View code"
               >
@@ -381,7 +262,14 @@ function ProjectCard({
                 href={project.live}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  trackEvent("project_click", {
+                    projectSlug: project.id,
+                    surface: "grid_card",
+                    link: "live",
+                  });
+                }}
                 className="text-text-muted hover:text-text-primary transition-colors"
                 aria-label="View demo"
               >
@@ -390,7 +278,7 @@ function ProjectCard({
             )}
           </div>
           <span className="text-xs text-accent flex items-center gap-1 group-hover:gap-2 transition-all">
-            Details <ArrowRight size={12} />
+            Case study <ArrowRight size={12} />
           </span>
         </div>
       </div>
@@ -401,7 +289,6 @@ function ProjectCard({
 /* ── Main Component ───────────────────────────────────────────── */
 export default function Projects() {
   const [activeFilter, setActiveFilter] = useState("all");
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const featuredProjects = projects.filter((p) => p.featured);
   const nonFeatured = projects.filter((p) => !p.featured);
@@ -428,17 +315,14 @@ export default function Projects() {
           <p className="text-text-secondary max-w-xl text-lg mb-12">
             Backend services, cloud infrastructure, and distributed systems —
             each with real architecture decisions and measurable outcomes.
+            Click any project for a full case study.
           </p>
         </motion.div>
 
         {/* Featured */}
         <div className="space-y-8 mb-16">
           {featuredProjects.map((project) => (
-            <FeaturedProjectCard
-              key={project.id}
-              project={project}
-              onSelect={setSelectedProject}
-            />
+            <FeaturedProjectCard key={project.id} project={project} />
           ))}
         </div>
 
@@ -466,28 +350,17 @@ export default function Projects() {
         </motion.div>
 
         {/* Project grid */}
-        <motion.div layout className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <motion.div
+          layout
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
           <AnimatePresence mode="popLayout">
             {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onSelect={setSelectedProject}
-              />
+              <ProjectCard key={project.id} project={project} />
             ))}
           </AnimatePresence>
         </motion.div>
       </div>
-
-      {/* Modal */}
-      <AnimatePresence>
-        {selectedProject && (
-          <ProjectModal
-            project={selectedProject}
-            onClose={() => setSelectedProject(null)}
-          />
-        )}
-      </AnimatePresence>
     </section>
   );
 }

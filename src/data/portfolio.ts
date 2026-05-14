@@ -46,6 +46,29 @@ export const aboutContent = {
   ],
 };
 
+export interface ProjectDecision {
+  title: string;
+  body: string;
+}
+
+export interface CaseStudy {
+  // Reading time estimate ("4 min read")
+  readingTime?: string;
+  // Architecture diagram in Mermaid syntax
+  architecture: {
+    diagram: string;
+    caption?: string;
+  };
+  // Deeper problem framing for the detail page
+  problemDeep: string;
+  // The interesting technical decisions, each with its trade-off
+  decisions: ProjectDecision[];
+  // What actually shipped / measurable outcomes
+  outcomes: string[];
+  // Honest list of what you'd improve / next steps
+  nextSteps: string[];
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -60,6 +83,7 @@ export interface Project {
   live?: string;
   featured: boolean;
   badge?: string;
+  caseStudy?: CaseStudy;
 }
 
 export const projects: Project[] = [
@@ -95,6 +119,65 @@ export const projects: Project[] = [
     categories: ["backend", "cloud"],
     github: "https://github.com/malav-250/distributed-task-queue",
     featured: true,
+    caseStudy: {
+      readingTime: "5 min read",
+      problemDeep:
+        "Async workloads — image transforms, PDF rendering, webhook delivery — need queue-based processing. Production task queues fail in subtle ways: silent message drops under broker restarts, duplicate execution when a worker dies mid-task, and cascading failures when a downstream API gets slow and consumes every worker thread. A naive Celery setup hits all three within the first month of real traffic.",
+      architecture: {
+        diagram: `flowchart LR
+    Client["FastAPI<br/>Producer"]
+    Idem[("Redis<br/>idempotency<br/>+ rate limit")]
+    RMQ[["RabbitMQ<br/>main queue"]]
+    Workers["Celery<br/>Workers"]
+    DLQ[["Dead Letter<br/>Queue"]]
+    CB[("Redis<br/>Circuit Breaker")]
+    DB[("PostgreSQL")]
+    Prom["Prometheus"]
+    Graf["Grafana"]
+
+    Client -->|"check key"| Idem
+    Client -->|"publish"| RMQ
+    RMQ --> Workers
+    Workers -->|"retry × 3<br/>exp backoff"| RMQ
+    Workers -->|"fail after 3"| DLQ
+    Workers -->|"upstream slow"| CB
+    Workers --> DB
+    Workers -->|"metrics"| Prom
+    Prom --> Graf`,
+        caption:
+          "Producer dedupes via idempotency key, RabbitMQ retries with exponential backoff before falling to a DLQ, Redis-backed circuit breakers shed load when downstream APIs slow down.",
+      },
+      decisions: [
+        {
+          title: "Dead-letter routing instead of silent drops",
+          body: "Celery's default behavior after exhausted retries is to log and move on — messages disappear. I added an explicit dead-letter exchange in RabbitMQ so failed jobs land in a queue I can inspect, replay, or alert on. The DLQ has its own dashboard panel; if it grows, on-call gets paged.",
+        },
+        {
+          title: "Idempotency keys, not natural-key dedup",
+          body: "Natural-key dedup (e.g. 'has this user_id+image_id been processed?') breaks down when retries cross worker boundaries. Clients pass an idempotency key on enqueue; Redis SETNX with a TTL gates duplicate enqueues. Survives worker crashes mid-task and broker restarts.",
+        },
+        {
+          title: "Circuit breakers in Redis, not in-process",
+          body: "An in-process circuit breaker (e.g. pybreaker) doesn't share state across worker processes — each one has to fail independently before tripping. Backing the breaker state in Redis makes it cluster-wide: one worker tripping the breaker protects the whole pool from hammering a sick upstream.",
+        },
+        {
+          title: "RabbitMQ over Kafka or SQS",
+          body: "Kafka's strengths (high-throughput log, replay) didn't match the workload — these are jobs, not events. SQS is fine but FIFO queue limits + no native DLQ pattern made it awkward. RabbitMQ gives me priority queues, native DLQ exchanges, and a well-understood operational model.",
+        },
+      ],
+      outcomes: [
+        "Zero message loss across 10K+ test jobs — the DLQ caught every failure that would have been silent",
+        "100% duplicate elimination measured by reprocessing the same idempotency key across forced worker crashes",
+        "Sub-50ms p99 API latency under concurrent load (rate limiter short-circuits before queueing on overload)",
+        "8 services orchestrated via Docker Compose; Terraform deploys the same topology to ECS Fargate",
+      ],
+      nextSteps: [
+        "Replace Docker Compose with EKS to practice K8s operational patterns",
+        "Add OpenTelemetry distributed tracing — correlation IDs are propagated but not yet emitted as spans",
+        "Add a Kafka topic for fan-out events (e.g. job completed → downstream consumers)",
+        "Publish load-test results from k6 with p50/p95/p99 graphs as part of the README",
+      ],
+    },
   },
   {
     id: "voice-agent",
@@ -123,6 +206,62 @@ export const projects: Project[] = [
     categories: ["ai", "backend"],
     github: "https://github.com/malav-250/deepgram-voice-agent",
     featured: true,
+    caseStudy: {
+      readingTime: "4 min read",
+      problemDeep:
+        "Real-time voice AI lives or dies on perceived latency. Human turn-taking happens around 200ms; anything past 500ms feels awkward. A naive STT → LLM → TTS pipeline serializes three slow systems — each waits for the previous to finish — so the user hears a multi-second pause after every utterance. The voice agent needs to start replying before the caller has even finished speaking.",
+      architecture: {
+        diagram: `flowchart LR
+    Phone["Phone Caller"]
+    TW["Twilio<br/>Media Streams"]
+    Server["FastAPI<br/>WebSocket Server"]
+    STT["Deepgram STT<br/>(streaming)"]
+    Router["Interrupt-Aware<br/>Router"]
+    LLM["LLM<br/>(token stream)"]
+    TTS["Deepgram TTS<br/>(streaming)"]
+
+    Phone <-->|"audio"| TW
+    TW <-->|"WebSocket<br/>bidirectional"| Server
+    Server -->|"caller chunks"| STT
+    STT -->|"partial<br/>transcripts"| Router
+    Router -->|"stable<br/>utterance"| LLM
+    LLM -->|"streaming<br/>tokens"| TTS
+    TTS -->|"audio chunks"| Server
+    Router -.->|"barge-in:<br/>drop in-flight"| TTS`,
+        caption:
+          "Audio streams in both directions over a single WebSocket. STT emits partial transcripts continuously; the router decides when the utterance is stable enough to commit to an LLM call. TTS chunks start playing as the LLM token-streams.",
+      },
+      decisions: [
+        {
+          title: "Stream everything, never wait",
+          body: "Deepgram's STT emits partial transcripts every ~100ms. The LLM emits tokens as they're generated. TTS speaks chunks as they arrive. Every stage starts producing output before the previous stage finishes — total perceived latency becomes the latency of the *slowest single chunk*, not the sum of all stages.",
+        },
+        {
+          title: "Interrupt-aware router for utterance commitment",
+          body: "When does the caller actually mean 'go'? Pause detection is fragile (some people speak slowly, some don't pause). The router watches for transcript stability — when the last N partial transcripts agree on the same text, the utterance is committed and sent to the LLM. If the caller resumes speaking mid-commit, the in-flight LLM call is cancelled.",
+        },
+        {
+          title: "Barge-in support",
+          body: "When the agent is mid-sentence and the caller starts talking, the agent has to stop. The router detects new STT input, sends a cancellation signal to the LLM, and immediately drops the in-flight TTS audio buffer. This is the single biggest UX difference between a 'voice AI demo' and something a real customer would tolerate.",
+        },
+        {
+          title: "Twilio Media Streams over WebRTC",
+          body: "WebRTC would give lower latency but requires JS in a browser. Twilio Media Streams works over the public switched telephone network — any phone, anywhere, no app required. The latency hit (~80-150ms round-trip over the carrier network) is acceptable for the use case (customer service, scheduling, lead qualification).",
+        },
+      ],
+      outcomes: [
+        "End-to-end perceived latency well under 1 second on a real phone call",
+        "Barge-in works reliably — caller can cut the agent off and the agent immediately yields",
+        "Interrupt-aware router prevents 'commit and regret' loops when speech is hesitant",
+        "Single FastAPI service handles the entire bidirectional audio pipeline",
+      ],
+      nextSteps: [
+        "Add an eval harness: scripted dialogues + measured turn-taking latency + transcript accuracy",
+        "Add a tool-calling layer (e.g. lookup calendar, book appointment) with structured-output validation",
+        "Persist conversation transcripts + audio for offline review",
+        "Test fallback paths: STT timeout, LLM provider outage, TTS quota exceeded",
+      ],
+    },
   },
   {
     id: "cloud-native-app",
@@ -155,6 +294,85 @@ export const projects: Project[] = [
     categories: ["cloud", "backend"],
     github: "https://github.com/malav-250/cloud-webapp",
     featured: true,
+    caseStudy: {
+      readingTime: "5 min read",
+      problemDeep:
+        "A 'real' production deployment surface — not a toy demo — has to handle the hard parts: AZ failure, blue-green cutover, private-subnet databases, IAM that follows least privilege, and infrastructure-as-code you can hand to the next engineer without a runbook. Most class projects stop at 'deploys to EC2'. This one had to survive an availability zone going dark.",
+      architecture: {
+        diagram: `flowchart TB
+    User["User"]
+    DNS["Route 53"]
+    ALB{"ALB<br/>SSL/TLS"}
+
+    subgraph VPC["VPC — 3 AZs"]
+        subgraph Public["Public Subnets"]
+            NAT["NAT Gateway"]
+        end
+        subgraph Private["Private Subnets"]
+            EC2a["FastAPI EC2<br/>AZ-a"]
+            EC2b["FastAPI EC2<br/>AZ-b"]
+            EC2c["FastAPI EC2<br/>AZ-c"]
+            RDS[("RDS PostgreSQL<br/>Multi-AZ")]
+        end
+    end
+
+    S3[("S3<br/>image storage")]
+    SNS["SNS<br/>signup events"]
+    Lambda["Lambda<br/>email verifier"]
+    DDB[("DynamoDB<br/>verification tokens")]
+    SG["SendGrid"]
+
+    User --> DNS
+    DNS --> ALB
+    ALB --> EC2a
+    ALB --> EC2b
+    ALB --> EC2c
+    EC2a --> RDS
+    EC2b --> RDS
+    EC2c --> RDS
+    EC2a --> S3
+    EC2a -->|"user signed up"| SNS
+    SNS --> Lambda
+    Lambda --> DDB
+    Lambda --> SG`,
+        caption:
+          "Three-AZ Auto Scaling Group behind an ALB. RDS lives in private subnets, reachable only from the app tier. Email verification runs as a serverless side-channel (SNS → Lambda → DynamoDB → SendGrid) so signup latency stays low.",
+      },
+      decisions: [
+        {
+          title: "3 AZs over 2",
+          body: "AWS bills for cross-AZ traffic, so 3 AZs costs more than 2. But with 2 AZs, losing one means halving capacity instantly; with 3, you keep 67%. For a service that's supposed to survive a real outage, the math favors 3. Production AWS deployments rarely use fewer.",
+        },
+        {
+          title: "Custom Packer AMIs over containers",
+          body: "ECS/EKS would be cleaner long-term, but the goal here was to learn the IaC-from-scratch surface: VPC, subnets, route tables, SGs, IAM, ASG, launch templates. Packer bakes the FastAPI app + deps + systemd unit into an AMI; the ASG launches new instances from each AMI version. Slower than container redeploys, but every primitive is in Terraform.",
+        },
+        {
+          title: "Blue-green via ASG instance refresh",
+          body: "Each new AMI triggers an ASG instance refresh: new instances spin up on the new AMI, the ALB drains traffic from the old ones, and only after health checks pass does the cutover complete. If health checks fail, the refresh halts and the old fleet stays serving. This is the simplest CI/CD pattern that gives real zero-downtime semantics on EC2.",
+        },
+        {
+          title: "DynamoDB for verification tokens, not RDS",
+          body: "Tokens are short-lived (TTL-expiring), high-write, low-read, and access-pattern is just 'lookup by token string'. RDS would mean adding another connection from Lambda → RDS through a VPC endpoint (slow cold starts, more config). DynamoDB is fully managed, has built-in TTL, and Lambda hits it over the public AWS API with millisecond latency.",
+        },
+        {
+          title: "SNS/Lambda for email — out of the request path",
+          body: "Sending email synchronously during signup ties your p99 latency to SendGrid's worst day. By publishing to SNS instead and letting Lambda handle email, the signup request returns the moment the user row is persisted. If email is slow or failing, the user still gets a fast signup; verification just takes longer.",
+        },
+      ],
+      outcomes: [
+        "Multi-AZ VPC across 3 zones; verified failover by terminating instances in a single AZ",
+        "Terraform manages every resource across 3 repos — webapp, infra, serverless",
+        "Zero-downtime CI/CD: PR validation → AMI bake → ASG rolling refresh",
+        "Serverless email side-channel keeps signup p99 latency decoupled from SendGrid",
+      ],
+      nextSteps: [
+        "Add CloudFront in front of the ALB for global edge caching of static assets",
+        "Migrate to ECS Fargate to drop the AMI bake step and tighten the deploy loop",
+        "Run a real GameDay: terminate an AZ via Chaos Engineering and measure recovery time",
+        "Publish a cost teardown — $/month per traffic tier, separated by service",
+      ],
+    },
   },
   {
     id: "transportation-platform",
