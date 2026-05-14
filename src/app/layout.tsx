@@ -4,22 +4,40 @@ import AnalyticsProvider from "@/components/AnalyticsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Malav Gajera | Software Engineer",
+  metadataBase: new URL("https://malavgajera.is-a.dev"),
+  title: "Malav Gajera | Backend & Cloud Engineer",
   description:
-    "Software Engineer specializing in scalable backend systems, cloud-native architectures, and ML pipelines. MS in Computer Software Engineering at Northeastern University.",
+    "Backend & Cloud Engineer. MS in Software Engineering @ Northeastern (3.9 GPA, Dec 2026). Software Engineer Co-op @ Crewasis. Open to full-time Jan 2027.",
   keywords: [
-    "Software Engineer",
-    "Backend Developer",
-    "Cloud Engineer",
-    "ML Engineer",
-    "Full Stack Developer",
     "Malav Gajera",
+    "Malav Gajera GitHub",
+    "Malav Gajera Northeastern",
+    "Malav Gajera portfolio",
+    "Backend Engineer",
+    "Cloud Engineer",
+    "Software Engineer Co-op",
+    "Northeastern University",
+    "FastAPI",
+    "Django",
+    "Spring Boot",
+    "AWS",
+    "Terraform",
   ],
+  alternates: {
+    canonical: "https://malavgajera.is-a.dev",
+  },
   openGraph: {
-    title: "Malav Gajera | Software Engineer",
+    title: "Malav Gajera | Backend & Cloud Engineer",
     description:
-      "Building scalable systems and intelligent applications. Backend, Cloud, and ML expertise.",
+      "MS @ Northeastern (3.9 GPA, Dec 2026). SWE Co-op @ Crewasis. Open to full-time Jan 2027.",
+    url: "https://malavgajera.is-a.dev",
+    siteName: "Malav Gajera",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Malav Gajera | Backend & Cloud Engineer",
+    description: "MS @ Northeastern · SWE Co-op @ Crewasis · Open Jan 2027",
   },
 };
 

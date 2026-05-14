@@ -13,17 +13,17 @@ export const heroContent = {
   headline: "Backend & Cloud",
   headlineAccent: "Engineer",
   subheadline:
-    "MS in Software Engineering @ Northeastern (3.9 GPA). Building production APIs, cloud infrastructure, and CI/CD pipelines. Currently shipping backend systems at Crewasis.",
+    "MS in Software Engineering @ Northeastern (3.9 GPA), graduating Dec 2026. Building production APIs, cloud infrastructure, and CI/CD pipelines. Currently shipping backend systems at Crewasis.",
   stats: [
     { value: "3.9", label: "MS GPA — Northeastern" },
-    { value: "2", label: "Backend Internships" },
-    { value: "Aug '26", label: "Available Full-Time" },
+    { value: "Dec '26", label: "Graduating" },
+    { value: "Jan '27", label: "Available Full-Time" },
   ],
 };
 
 export const aboutContent = {
   description:
-    "I'm a grad student at Northeastern University finishing my MS in Software Engineering (3.9 GPA). Currently building production backend systems at Crewasis — writing Django APIs, optimizing PostgreSQL queries, provisioning AWS infrastructure, and shipping weekly. Previously built REST APIs in C#/ASP.NET Core at Tatvasoft. I focus on backend services, cloud infrastructure, and the CI/CD that ties them together.",
+    "I'm a Master's student at Northeastern University finishing my MS in Software Engineering (3.9 GPA), graduating December 2026. Currently building production backend systems at Crewasis — writing Django APIs, optimizing PostgreSQL queries, provisioning AWS infrastructure, and shipping weekly. Previously built REST APIs in C#/ASP.NET Core at Tatvasoft. I focus on backend services, cloud infrastructure, and the CI/CD that ties them together.",
   highlights: [
     {
       title: "Backend Services",
@@ -159,32 +159,6 @@ export const projects: Project[] = [
 
   // ── OTHER PROJECTS ───────────────────────────────────────────
   {
-    id: "healthcare-platform",
-    title: "Healthcare Management Platform",
-    subtitle: "ASP.NET MVC — Repository Pattern, PostgreSQL",
-    description:
-      "Full-stack healthcare platform with virtual consultations, appointment scheduling, and patient data management. Built with ASP.NET MVC and PostgreSQL using repository pattern for clean data access.",
-    problem:
-      "Healthcare providers needed a reliable platform for virtual consultations with real-time patient data access and automated appointment workflows.",
-    solution:
-      "Built the backend with ASP.NET MVC and PostgreSQL. Used repository pattern architecture for clean separation of data access, implemented appointment scheduling with automated patient notifications, and optimized query performance for concurrent users.",
-    impact: [
-      "Repository pattern architecture for maintainable data access layer",
-      "PostgreSQL query optimization for 150+ concurrent users",
-      "Automated appointment scheduling and patient notification system",
-      "Unit testing with 20% reduction in production bugs",
-    ],
-    techStack: [
-      "C#",
-      "ASP.NET MVC",
-      "PostgreSQL",
-      "JavaScript",
-      "Repository Pattern",
-    ],
-    categories: ["backend"],
-    featured: false,
-  },
-  {
     id: "distributed-training-infra",
     title: "Distributed Training Infrastructure",
     subtitle: "Multi-GPU Pipeline — PyTorch DDP, HDF5, ETL",
@@ -208,8 +182,7 @@ export const projects: Project[] = [
       "Weights & Biases",
     ],
     categories: ["ai", "backend"],
-    github:
-      "https://github.com/malav-250/Real-Time-Parallel-Shoplifting-Detection-using-Multimodal-AI",
+    github: "https://github.com/malav-250/distributed-training-pipeline",
     featured: false,
   },
 
@@ -243,119 +216,35 @@ export const projects: Project[] = [
     badge: "Hackathon Winner",
   },
   {
-    id: "doc-compliance-tool",
-    title: "AI Document Compliance Tool",
-    subtitle: "MINeD 2025 Hackathon — 3rd Place ($200)",
+    id: "papervet",
+    title: "PaperVet — Research Paper Compliance AI",
+    subtitle: "MINeD 2025 Hackathon · 3rd Place",
     description:
-      "AI-powered tool that automates research paper compliance checks using OCR and image processing, reducing rejection rates for academic submissions.",
+      "Computer-vision pipeline that audits research papers against submission guidelines automatically — catching formatting and compliance issues before reviewers see them.",
     problem:
-      "Research paper submissions frequently get rejected due to formatting and compliance issues, wasting researchers' time and delaying publication.",
+      "Research papers frequently get desk-rejected on formatting alone (margins, fonts, figure resolution, citation style). Authors waste days on revisions that an automated checker could surface in seconds.",
     solution:
-      "Engineered a Python-based compliance assessment tool using Streamlit for the UI, OpenCV for advanced image processing, and PyTesseract for OCR to automatically scan and validate document formatting against submission guidelines.",
+      "Built an OCR + computer-vision audit pipeline: PyTesseract extracts text, OpenCV measures layout properties (margins, line spacing, font sizes), and a rules engine validates each property against a configurable submission template. Generates an annotated PDF report flagging every violation with location and fix.",
     impact: [
-      "40% reduction in research paper rejection rates",
-      "40% boost in document clarity and formatting compliance",
-      "Won 3rd Place at MINeD 2025 Hackathon ($200 prize)",
-      "Streamlined research workflows saving significant manual effort",
+      "40% reduction in research paper rejection rates among test users",
+      "Annotated PDF reports pinpoint every compliance violation",
+      "Configurable rule engine — swap submission templates per venue",
+      "3rd place at MINeD 2025 Hackathon",
     ],
     techStack: [
       "Python",
-      "Streamlit",
       "OpenCV",
       "PyTesseract",
       "OCR",
-      "Image Processing",
+      "Computer Vision",
+      "Rule Engine",
     ],
     categories: ["ai", "fullstack"],
     featured: false,
     badge: "Hackathon Winner",
   },
 
-  // ── RESEARCH ────────────────────────────────────────────────────
-  {
-    id: "lung-sound-detection",
-    title: "Lung Sound Disease Detection",
-    subtitle: "Deep Learning Research with EfficientNet + Attention",
-    description:
-      "Researched and implemented a deep learning system using EfficientNet with attention mechanisms to automatically diagnose respiratory diseases from lung sound audio recordings.",
-    problem:
-      "Lung sounds carry subtle variations that even experienced doctors can miss, leading to delayed or inaccurate diagnoses of respiratory conditions.",
-    solution:
-      "Researched and built an EfficientNet-B0 model enhanced with attention mechanisms, trained on the ICBHI 2017 dataset. Implemented bandpass Butterworth filtering for noise removal, audio data augmentation, and mel spectrogram conversion as preprocessing pipeline for the deep learning model.",
-    impact: [
-      "Achieved 99.82% validation accuracy with EfficientNet-B0 + attention",
-      "Built end-to-end audio preprocessing and classification pipeline",
-      "99.82% precision, recall, and F1-score across disease classes",
-      "Implemented state-of-the-art attention mechanisms for audio analysis",
-    ],
-    techStack: [
-      "Python",
-      "TensorFlow",
-      "EfficientNet",
-      "Attention Mechanisms",
-      "Mel Spectrograms",
-      "ICBHI Dataset",
-    ],
-    categories: ["ai", "research"],
-    featured: false,
-    badge: "Research",
-  },
-  {
-    id: "v2x-collision-avoidance",
-    title: "Vehicle Collision Avoidance System",
-    subtitle: "Reinforcement Learning + V2X Communication",
-    description:
-      "Research on intelligent collision avoidance using Vehicle-to-Everything (V2X) communication and reinforcement learning for autonomous decision-making.",
-    problem:
-      "Traditional collision avoidance systems rely on limited sensor data. V2X communication can expand awareness but requires intelligent decision-making algorithms.",
-    solution:
-      "Built a collision avoidance framework using V2X communication protocols with reinforcement learning algorithms for optimized real-time decision-making. Tested and validated in SUMO traffic simulator for realistic traffic scenarios.",
-    impact: [
-      "RL-optimized decision-making for real-time collision avoidance",
-      "Tested in SUMO simulator with real-world traffic patterns",
-      "V2X communication for expanded vehicle situational awareness",
-      "Framework applicable to autonomous driving research",
-    ],
-    techStack: [
-      "Python",
-      "Reinforcement Learning",
-      "V2X",
-      "SUMO Simulator",
-      "Deep Learning",
-    ],
-    categories: ["ai", "research"],
-    featured: false,
-    badge: "Research",
-  },
-
   // ── ML & AI ─────────────────────────────────────────────────────
-  {
-    id: "quora-duplicate-detection",
-    title: "Quora Duplicate Question Detection",
-    subtitle: "BERT-Powered NLP Classification",
-    description:
-      "Deep learning model using BERT to identify semantically duplicate questions on Quora, outperforming traditional ML approaches.",
-    problem:
-      "Quora's platform suffers from duplicate questions that fragment knowledge and reduce answer quality for users searching for information.",
-    solution:
-      "Built a deep learning classification model leveraging BERT (Bidirectional Encoder Representations from Transformers) for semantic similarity detection between question pairs, with fine-tuning on the Quora Question Pairs dataset.",
-    impact: [
-      "89.28% validation accuracy on duplicate detection",
-      "Outperformed traditional ML models by 10%",
-      "Effective semantic similarity using BERT embeddings",
-      "Scalable inference pipeline for real-time classification",
-    ],
-    techStack: [
-      "Python",
-      "BERT",
-      "Transformers",
-      "PyTorch",
-      "NLP",
-      "Hugging Face",
-    ],
-    categories: ["ai"],
-    featured: false,
-  },
   {
     id: "deepgram-voice-agent",
     title: "AI Voice Agent",
@@ -534,7 +423,7 @@ export interface Experience {
 export const experiences: Experience[] = [
   {
     company: "Crewasis",
-    role: "Software Engineer Intern",
+    role: "Software Engineer Co-op",
     location: "New York, USA",
     period: "Jan 2026 — Present",
     current: true,
@@ -581,7 +470,7 @@ export const education = [
     school: "Northeastern University",
     degree: "Master of Science in Computer Software Engineering",
     location: "Boston, MA",
-    period: "Sept 2024 — May 2026",
+    period: "Sept 2024 — Dec 2026",
     gpa: "3.9",
     coursework: [
       "Object-Oriented Design",

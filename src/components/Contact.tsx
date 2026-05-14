@@ -48,7 +48,7 @@ export default function Contact() {
             Let&apos;s connect.
           </h3>
           <p className="text-text-secondary text-lg mb-14 leading-relaxed">
-            Looking for backend and cloud engineering roles starting August 2026.
+            Looking for backend and cloud engineering full-time roles starting January 2027.
             Let&apos;s talk about how I can contribute to your team.
           </p>
 
