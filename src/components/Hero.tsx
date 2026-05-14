@@ -104,7 +104,7 @@ export default function Hero() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            Software Engineer Co-op at Crewasis — Open to backend/cloud roles Jan 2027
+            Building AI-marketing infrastructure at Crewasis — Open to backend/cloud roles Jan 2027
           </motion.div>
 
           {/* Headline with word-by-word reveal */}
@@ -148,6 +148,15 @@ export default function Hero() {
               <div className="absolute inset-0 bg-gradient-to-r from-accent to-accent-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </a>
             <a
+              href={personalInfo.github}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-2 px-7 py-3.5 border border-border-light text-text-primary rounded-xl hover:bg-surface-light/80 hover:border-accent/30 hover:text-accent transition-all duration-300 text-sm font-medium"
+            >
+              <Github size={16} />
+              GitHub
+            </a>
+            <a
               href="#contact"
               onClick={() => trackEvent("contact_click", { source: "hero_cta" })}
               className="px-7 py-3.5 border border-border-light text-text-primary rounded-xl hover:bg-surface-light/80 hover:border-accent/30 transition-all duration-300 text-sm font-medium"
@@ -156,11 +165,6 @@ export default function Hero() {
             </a>
             <div className="flex items-center gap-2 ml-2">
               {[
-                {
-                  href: personalInfo.github,
-                  icon: <Github size={18} />,
-                  label: "GitHub",
-                },
                 {
                   href: personalInfo.linkedin,
                   icon: <Linkedin size={18} />,

@@ -126,7 +126,7 @@ export default function Contact() {
           >
             <span className="relative z-10 flex items-center gap-2">
               <Mail size={16} />
-              Send me an email
+              Email me about Jan 2027 backend/cloud roles
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-accent to-accent-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </motion.a>
