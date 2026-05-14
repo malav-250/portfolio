@@ -10,6 +10,7 @@ const navLinks = [
   { href: "#experience", label: "Experience" },
   { href: "#projects", label: "Projects" },
   { href: "#skills", label: "Skills" },
+  { href: "/blog", label: "Blog" },
   { href: "#contact", label: "Contact" },
 ];
 
@@ -40,9 +41,11 @@ export default function Navbar() {
 
     window.addEventListener("scroll", onScroll);
 
-    // Observe sections after a tick so DOM is ready
+    // Observe sections after a tick so DOM is ready.
+    // Skip non-hash links (e.g. /blog) — they navigate to other routes.
     setTimeout(() => {
       navLinks.forEach((link) => {
+        if (!link.href.startsWith("#")) return;
         const el = document.querySelector(link.href);
         if (el) observer.observe(el);
       });

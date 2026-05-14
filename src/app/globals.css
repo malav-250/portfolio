@@ -274,3 +274,151 @@ body {
   opacity: 0;
   transform: translateY(20px);
 }
+
+/* ── Blog Post Prose ───────────────────────────────────────────── */
+/* Styles for markdown rendered via react-markdown on /blog/[slug] pages.
+   Designed to match the rest of the portfolio's dark aesthetic without
+   relying on @tailwindcss/typography. */
+
+.prose-blog {
+  color: var(--color-text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+.prose-blog > * + * {
+  margin-top: 1.5em;
+}
+
+.prose-blog h2 {
+  color: var(--color-text-primary);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-top: 2.25em;
+  margin-bottom: 0.6em;
+  scroll-margin-top: 6rem;
+}
+
+.prose-blog h3 {
+  color: var(--color-text-primary);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+}
+
+.prose-blog h4 {
+  color: var(--color-text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+}
+
+.prose-blog p {
+  color: var(--color-text-secondary);
+}
+
+.prose-blog strong,
+.prose-blog b {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.prose-blog a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(6, 182, 212, 0.4);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s ease;
+}
+.prose-blog a:hover {
+  text-decoration-color: var(--color-accent);
+}
+
+.prose-blog ul,
+.prose-blog ol {
+  padding-left: 1.4em;
+}
+.prose-blog ul { list-style: disc; }
+.prose-blog ol { list-style: decimal; }
+.prose-blog li { margin-top: 0.4em; padding-left: 0.3em; }
+.prose-blog li::marker { color: var(--color-accent); }
+
+/* Inline code */
+.prose-blog code {
+  background: var(--color-surface-light);
+  color: var(--color-accent);
+  padding: 0.15em 0.4em;
+  border-radius: 0.35rem;
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 0.875em;
+  border: 1px solid var(--color-border);
+}
+
+/* Code blocks — rehype-highlight wraps with <pre><code class="hljs">.
+   We override the inline-code styles inside <pre>. */
+.prose-blog pre {
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+  margin: 1.5em 0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.prose-blog pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  font-size: 0.875rem;
+}
+
+.prose-blog blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1.1em;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  margin: 1.5em 0;
+}
+
+.prose-blog hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 2.5em 0;
+}
+
+.prose-blog table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 0.95em;
+}
+
+.prose-blog thead {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.prose-blog th {
+  text-align: left;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  padding: 0.75em 1em;
+  background: var(--color-surface-light);
+}
+
+.prose-blog td {
+  padding: 0.75em 1em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.prose-blog em {
+  color: var(--color-text-secondary);
+}
