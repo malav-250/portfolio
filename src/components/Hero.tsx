@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail, FileText } from "lucide-react";
 import { heroContent, personalInfo } from "@/data/portfolio";
@@ -92,6 +93,33 @@ export default function Hero() {
         style={{ y, opacity }}
         className="relative z-10 max-w-6xl mx-auto px-6 py-32"
       >
+        {/* Headshot — desktop only (lg+). Floats top-right, balancing the
+            left-aligned text. Hidden on mobile so the small viewport
+            stays text-focused. */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, x: 20 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          transition={{ duration: 0.9, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="hidden lg:block absolute top-32 right-6 xl:right-10 pointer-events-none"
+        >
+          <div className="relative w-44 h-44 xl:w-52 xl:h-52">
+            {/* Soft accent halo behind the portrait */}
+            <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-accent/25 via-accent-secondary/15 to-transparent blur-2xl" />
+            <div className="relative w-full h-full rounded-full overflow-hidden ring-1 ring-accent/30 shadow-[0_0_50px_rgba(6,182,212,0.18)]">
+              <Image
+                src="/headshot.jpg"
+                alt="Malav Gajera — Backend & Cloud Engineer"
+                fill
+                sizes="(min-width: 1280px) 208px, 176px"
+                className="object-cover"
+                priority
+              />
+              {/* Inner highlight ring for depth */}
+              <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/5" />
+            </div>
+          </div>
+        </motion.div>
+
         <div className="max-w-4xl">
           {/* Status badge */}
           <motion.div
