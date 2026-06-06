@@ -270,4 +270,182 @@ This is the kind of architecture that doesn't show up on a system-design whitebo
 
 *The full implementation lives in [malav-250/distributed-task-queue](https://github.com/malav-250/distributed-task-queue). The architecture diagram and decision log are on the [case study page](/projects/distributed-task-queue).*`,
   },
+  {
+    slug: "cost-of-three-azs",
+    title: "The cost of three AZs",
+    subtitle:
+      "What multi-AZ resilience actually costs per month on AWS — and when two zones is the honest right answer.",
+    excerpt:
+      "Most cloud tutorials spread workloads across two AZs and stop. Three AZs gets you stronger failover but costs measurably more — usually NAT Gateways, not what you'd expect. Here's the real monthly bill, line by line.",
+    publishedAt: "2026-06-08",
+    readingTime: "8 min read",
+    tags: ["Cloud", "AWS", "Cost Engineering", "Infrastructure"],
+    content: `## Why this matters
+
+When I was building the [Resilient Cloud Deployment Platform](/projects/cloud-native-app), I made an architectural decision early on: deploy across **three** availability zones, not two. The reasoning is in the case study (capacity preservation under AZ failure: 67% vs 50%). What I didn't include there is the money side.
+
+"Three AZs is more resilient" is the easy headline. The honest version is: three AZs is more resilient **and costs about 35% more per month for a small workload**. Whether that markup is worth it depends on what you're protecting against. This post is the actual cost teardown — line by line, with real AWS pricing — so you can make the call for your own system.
+
+## The decision frame
+
+There are three configurations worth comparing for a typical FastAPI/Spring Boot app behind an ALB:
+
+1. **Single AZ** — one EC2, no resilience. Fine for personal projects. Won't survive a routine AWS maintenance event. Excluded from this comparison.
+2. **Two AZs** — the AWS Well-Architected starter pattern. Loses 50% capacity if an AZ fails.
+3. **Three AZs** — loses 33% capacity if an AZ fails. The pattern production teams ship.
+
+I'll model both 2-AZ and 3-AZ for the same workload: a small FastAPI app behind an ALB, with a Multi-AZ RDS, and outbound internet access via NAT Gateways. The instance types are real (small enough to actually use for a portfolio-scale app), and all prices are AWS's published US-East-1 rates.
+
+## The line items
+
+### EC2 instances
+
+The app tier runs an Auto Scaling Group with one EC2 per AZ.
+
+| Instance | Hourly | Monthly (730h) |
+|---|---|---|
+| t3.small | $0.0208 | **$15.18** |
+
+- **2 AZ:** 2 × $15.18 = **$30.36/mo**
+- **3 AZ:** 3 × $15.18 = **$45.54/mo**
+- Difference: **+$15.18/mo** for the extra zone.
+
+This is the obvious cost. It's also the smallest.
+
+### Application Load Balancer
+
+The ALB is what most people overlook. It's billed per hour **plus** per LCU (Load Balancer Capacity Unit), which measures actual traffic.
+
+| Item | Cost |
+|---|---|
+| ALB hour | $0.0225/hr × 730 = **$16.43/mo** |
+| LCUs | ~$0.008/LCU-hour; ignored at portfolio traffic |
+
+The ALB cost is identical in both setups — one ALB spans all enabled subnets. Adding a third AZ to the ALB is free.
+
+- **2 AZ ALB:** $16.43/mo
+- **3 AZ ALB:** $16.43/mo
+- Difference: **$0**
+
+### NAT Gateway — the sneaky one
+
+Every app instance in a private subnet needs outbound internet access (for pulling Docker images, calling SendGrid, etc.). That goes through a NAT Gateway. **AWS charges per NAT Gateway** — hourly fee + per-GB data processing.
+
+| Item | Cost |
+|---|---|
+| NAT Gateway hour | $0.045/hr × 730 = **$32.85/mo per gateway** |
+| Data processed | $0.045/GB |
+
+Here's the choice that hits the bill hardest:
+
+**Option A — one shared NAT** (cheap, fragile):
+Put one NAT Gateway in AZ-a. Route the private subnets in AZ-b and AZ-c through it. Cost: **$32.85/mo total**.
+**Problem:** if AZ-a fails, app instances in AZ-b and AZ-c lose outbound internet. Your "multi-AZ" deployment is no longer resilient — it has a single point of failure in AZ-a.
+
+**Option B — one NAT per AZ** (the right answer):
+A NAT Gateway in each AZ, with each private subnet routing through its own AZ's NAT. Real isolation.
+
+- **2 AZ:** 2 × $32.85 = **$65.70/mo**
+- **3 AZ:** 3 × $32.85 = **$98.55/mo**
+- Difference: **+$32.85/mo** just for the third NAT.
+
+This is the biggest line-item gap between the two configurations. It catches everyone the first time.
+
+### RDS Multi-AZ
+
+RDS Multi-AZ uses **two AZs**: a primary in one, a synchronous standby in another. It doesn't matter how many AZs your app tier uses — RDS Multi-AZ is two AZs regardless.
+
+| Item | Cost |
+|---|---|
+| db.t3.micro single-AZ | $0.017/hr × 730 = $12.41/mo |
+| db.t3.micro Multi-AZ | 2× = **$24.82/mo** |
+
+- **2 AZ:** $24.82/mo
+- **3 AZ:** $24.82/mo
+- Difference: **$0**
+
+(If you want database failover across three AZs you reach for Aurora, where Multi-AZ is more nuanced. Out of scope here.)
+
+### Cross-AZ data transfer
+
+Inter-AZ traffic isn't free. The ALB routes requests to whichever AZ has a healthy instance, which means roughly 1/N of your traffic crosses an AZ boundary going in, and 1/N goes back out.
+
+| Item | Cost |
+|---|---|
+| Inter-AZ traffic | $0.01/GB inbound + $0.01/GB outbound |
+
+For a portfolio-scale app pushing ~50GB/month between AZs:
+
+- **2 AZ:** ~$1/mo
+- **3 AZ:** ~$2/mo
+- Difference: **+$1/mo**
+
+Negligible for hobby traffic. Not negligible if you're moving terabytes — but if you're moving terabytes, your conversation is no longer "2 vs 3 AZs."
+
+## The bill
+
+Putting it all together:
+
+| Line item | 2 AZ | 3 AZ |
+|---|---|---|
+| EC2 instances | $30.36 | $45.54 |
+| ALB | $16.43 | $16.43 |
+| NAT Gateways (one per AZ) | $65.70 | $98.55 |
+| RDS Multi-AZ (db.t3.micro) | $24.82 | $24.82 |
+| Cross-AZ data transfer | $1 | $2 |
+| **Total** | **~$138** | **~$187** |
+| **Difference** | — | **+$49/mo (+35%)** |
+
+For a one-developer portfolio app, that's $588/year for one extra zone of resilience.
+For a 10× larger startup workload, multiply all line items proportionally — the difference scales close to linearly until the numbers get big enough that you reach for Reserved Instances or Savings Plans, which work in either configuration.
+
+## When 2 AZs is the right call
+
+Don't assume more is better. Two AZs is genuinely the right answer when:
+
+- You're cost-constrained and not running production traffic
+- Your customers are willing to tolerate degraded capacity during the rare AZ outage (a few hours per year)
+- You can absorb the failure with auto-scaling — if AZ-a goes down, the ASG can spin up extra instances in AZ-b to cover the load (assuming there's capacity available, which is itself not guaranteed during a regional event)
+- You're running a stateful workload where adding a third AZ creates more coordination overhead than it's worth
+
+If you're a solo founder or a student project, **start with 2 AZs**. Spend the saved $49/month on a domain, a logging service, or genuinely useful Cloudflare features. Move to 3 AZs when your uptime SLA actually demands it.
+
+## When 3 AZs is the right call
+
+The pattern flips when you have any of:
+
+- **A real SLA** (99.9% or higher) — math: an AZ failure consumes a significant slice of your annual error budget on 2-AZ; 3 AZs gives you headroom
+- **Stateful systems with quorum requirements** — etcd, ZooKeeper, Kafka, Cassandra — 3 AZs is the minimum for losing one zone without losing quorum
+- **Compliance-heavy workloads** (HIPAA, FedRAMP, PCI) — auditors specifically look for multi-AZ topology
+- **Stateless app tiers where the cost difference is < 5% of your total bill** — if you're already paying $5k/month for RDS, the extra $35 for a third NAT Gateway is not the conversation
+
+## The hidden costs nobody mentions
+
+If you're building this from scratch, three more invisible costs to budget for:
+
+1. **CloudWatch logs and metrics** scale with the number of instances. Tripling app instances doesn't triple log costs if you're already at the free tier, but it does push you over the line sooner. Budget another $5-15/month at small scale.
+2. **VPC endpoints** (for S3, DynamoDB, etc.) are billed per AZ. If you've enabled gateway endpoints (free) you're fine. If you've enabled interface endpoints ($7/month per endpoint per AZ), each AZ counts separately.
+3. **Engineer time during AZ failover testing.** This is the cost nobody puts in their spreadsheet. The first AZ outage you experience teaches you whether your "multi-AZ" topology actually works. Budget half a day per quarter to terminate instances in one AZ and watch what breaks.
+
+## The framing I use now
+
+When I'm designing a new system, I ask three questions in order:
+
+1. **Does this system need to survive an AZ outage at all?** For internal tools used by 10 employees: probably not. For anything customer-facing: yes.
+2. **Does it carry state?** If yes, the AZ count is partly chosen by the state system (etcd/ZooKeeper/Kafka want 3). If no, the AZ count is a pure cost-vs-capacity-during-failure trade.
+3. **Can the team operate it in production?** Three AZs means three subnets, three NAT gateways, three sets of routes, three of everything. If you don't have someone who has actually debugged a multi-AZ network issue under stress, your three-AZ deployment is more theoretical than real.
+
+## Takeaways
+
+- **The cost difference between 2 and 3 AZs is ~35% per month** for a small workload — driven mostly by NAT Gateways, not EC2 instances.
+- **The bill goes up roughly linearly with AZ count**, until you hit RI/Savings Plan territory.
+- **One shared NAT Gateway is a single point of failure** — if you're paying for "multi-AZ" but routing all egress through one NAT, you're paying for an illusion. Always one NAT per AZ in production.
+- **Two AZs is honest engineering** for small workloads, students, and personal projects. Three AZs is honest engineering for anything with a real SLA.
+
+The right answer is whichever one you can defend with numbers. Either is fine; the wrong move is paying for three AZs and shipping the topology of one.
+
+---
+
+*The 3-AZ topology I built lives in [malav-250/cloud-tf-aws-infra](https://github.com/malav-250/cloud-tf-aws-infra) and is described in the [case study](/projects/cloud-native-app). Previous post: [Designing dead-letter routing for a distributed task queue](/blog/dead-letter-routing).*`,
+  },
 ];
