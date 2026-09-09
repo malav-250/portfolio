@@ -14,261 +14,403 @@ export interface BlogPost {
 export const blogPosts: BlogPost[] = [
   {
     slug: "dead-letter-routing",
-    title: "Designing dead-letter routing for a distributed task queue",
+    title: "Dead-lettering without a Dead Letter Exchange",
     subtitle:
-      "Why naive retries silently drop messages, and the RabbitMQ patterns that keep them visible.",
+      "RabbitMQ will route failed messages for you at the broker level. I chose not to let it — here's what that bought, and what it cost.",
     excerpt:
-      "The default Celery retry behavior eats failures alive. Here's how I designed a dead-letter routing layer that turns every silent drop into an observable, replayable signal.",
+      "RabbitMQ has a built-in mechanism for failed messages: point a queue at a Dead Letter Exchange and the broker routes them for you. I built the dead-letter path in my application instead. That made my DLQ a SQL table and my replay an HTTP call — and gave up the one thing the broker does that my application can't.",
     publishedAt: "2026-05-14",
     readingTime: "9 min read",
-    tags: ["Backend", "Distributed Systems", "Celery", "RabbitMQ"],
-    content: `## The failure mode nobody talks about
+    tags: ["Backend", "Distributed Systems", "Celery", "RabbitMQ", "Postgres"],
+    content: `## The decision
 
-Most tutorials for Celery + RabbitMQ stop at "use \`retry\` on the task decorator and you're good." That gets you through a demo. It does not survive production.
+Every Celery + RabbitMQ walkthrough that gets as far as failure handling arrives at the same place: RabbitMQ's **Dead Letter Exchange**. Set \`x-dead-letter-exchange\` on a queue, and when a message is rejected without requeue — or expires, or overflows a length limit — the broker routes it to an exchange of your choosing instead of dropping it. It's a good mechanism. It's well documented, it's battle-tested, and it keeps working whether or not your consumers are healthy.
 
-Here's what actually happens once real traffic hits an unmodified Celery worker pool:
+I had that option and I didn't take it.
 
-1. A downstream API gets slow.
-2. Workers wait on the slow call. Concurrency drops.
-3. The queue fills up.
-4. Celery's default \`max_retries=3\` exhausts, and the task **silently disappears** — Celery logs a warning and moves on.
-5. Nobody notices until a customer asks why their image never got processed.
+In the task queue I built, a job that exhausts its retries doesn't get dead-lettered by RabbitMQ. It gets dead-lettered by my application: a Celery failure hook classifies the exception, writes a terminal state to Postgres, increments a counter, and forwards a summary to a dedicated queue. RabbitMQ never learns that anything went wrong.
 
-Step 4 is the killer. Celery's default behavior after exhausted retries is to log the failure at \`WARNING\` and acknowledge the message. The broker considers it handled. The task is gone. There's no record in your database, no row in a "failed jobs" table, no alert.
+This post is about why, what that bought, and — the part that matters more — what it cost. The broker-level design has one real advantage I gave up, and it isn't small.
 
-This is the problem dead-letter routing solves. Properly designed, it converts every "I gave up on this message" event into a row in a queue you can inspect, alert on, and replay.
+## What the two designs actually are
 
-## What "dead letter" actually means
+**Broker-level (DLX).** The queue carries an argument. On terminal rejection, RabbitMQ moves the message to the dead-letter exchange and stamps an \`x-death\` header with the reason, the originating queue, and a count. Your DLQ *is* a RabbitMQ queue. To see what's in it, you consume from it. To replay, you republish.
 
-In RabbitMQ, a **dead letter** is a message that has been rejected by a consumer, has expired, or has overflowed a queue length limit. By default, dead letters are dropped silently. But RabbitMQ has a per-queue setting called the **Dead Letter Exchange** (DLX): when a message dies on this queue, route it to that exchange instead of dropping it.
-
-The pattern is:
-
-\`\`\`
-main_queue ──(DLX)──▶ dlx_exchange ──▶ dead_letter_queue
-\`\`\`
-
-The dead-letter queue (DLQ) is just a normal queue. You can:
-- **Read from it** to inspect what failed and why.
-- **Set up alerts** on its length so on-call gets paged when it grows.
-- **Replay** messages back to the main queue once the upstream issue is fixed.
-
-It's the queueing equivalent of a "failed_jobs" database table — but cheaper, observable, and operationally first-class.
-
-## A concrete RabbitMQ setup
-
-Here's the topology I shipped. Two exchanges, two queues, all declared in code at startup:
+**Application-level.** The working queues carry no dead-letter argument at all. The worker's failure hook decides instead. My job table already had a \`status\` column and a lifecycle:
 
 \`\`\`python
-# rabbitmq/topology.py
-import pika
-
-def declare_topology(channel: pika.adapters.blocking_connection.BlockingChannel) -> None:
-    # 1. The main exchange where producers publish.
-    channel.exchange_declare(
-        exchange="jobs",
-        exchange_type="direct",
-        durable=True,
-    )
-
-    # 2. The dead-letter exchange. Failed messages get routed here.
-    channel.exchange_declare(
-        exchange="jobs.dlx",
-        exchange_type="direct",
-        durable=True,
-    )
-
-    # 3. The main queue. Note the x-dead-letter-exchange argument:
-    #    when a message is rejected (basic.nack with requeue=False)
-    #    or its TTL expires, it gets routed to the DLX.
-    channel.queue_declare(
-        queue="jobs.main",
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": "jobs.dlx",
-            "x-dead-letter-routing-key": "jobs.failed",
-        },
-    )
-    channel.queue_bind(queue="jobs.main", exchange="jobs", routing_key="jobs")
-
-    # 4. The DLQ — just a normal queue bound to the DLX.
-    channel.queue_declare(queue="jobs.dlq", durable=True)
-    channel.queue_bind(
-        queue="jobs.dlq",
-        exchange="jobs.dlx",
-        routing_key="jobs.failed",
-    )
+# src/domain/enums.py
+class JobStatus(StrEnum):
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    DEAD_LETTERED = "dead_lettered"
 \`\`\`
 
-That's the whole infrastructure piece. Two exchanges, two queues, four lines of \`arguments\` config.
+Dead-lettering, in this design, is a state transition. The DLQ isn't a queue holding messages; it's a \`WHERE status = 'dead_lettered'\` predicate over rows I was already writing.
 
-## What Celery has to do
+That reframing is the whole decision. Everything below follows from it.
 
-Celery doesn't know about RabbitMQ's DLX out of the box. You have to **not requeue** on terminal failure — otherwise the message goes back to the main queue, loops forever, and never hits the DLX.
+## The topology, and what's conspicuously absent
 
 \`\`\`python
-# tasks.py
-from celery import Task, shared_task
-from celery.exceptions import MaxRetriesExceededError
+# src/worker/celery_app.py
+default_exchange = Exchange("tasks", type="direct")
+dlq_exchange = Exchange("dlq", type="direct")
 
-class DeadLetterAware(Task):
+celery_app.conf.task_queues = (
+    Queue("critical", default_exchange, routing_key="critical",
+          queue_arguments={"x-max-priority": 10}),
+    Queue("default", default_exchange, routing_key="default",
+          queue_arguments={"x-max-priority": 10}),
+    Queue("bulk", default_exchange, routing_key="bulk",
+          queue_arguments={"x-max-priority": 10}),
+    Queue("dlq", dlq_exchange, routing_key="dlq"),
+)
+\`\`\`
+
+Four queues: three priority tiers and a \`dlq\`. Note what isn't there. No \`x-dead-letter-exchange\`, no \`x-dead-letter-routing-key\` on any working queue. The \`dlq\` queue exists, but **nothing in the broker routes to it.** My application does.
+
+The two settings that make any of this matter:
+
+\`\`\`python
+# src/worker/celery_app.py
+celery_app.conf.task_acks_late = True
+celery_app.conf.task_reject_on_worker_lost = True
+celery_app.conf.worker_prefetch_multiplier = 1  # Fair dispatch
+\`\`\`
+
+\`task_acks_late\` moves the broker acknowledgement to *after* the task returns rather than before it starts, so a worker that dies mid-task leaves the message unacknowledged and it gets redelivered. \`task_reject_on_worker_lost\` means a SIGKILL doesn't count as a clean ack. Together they buy at-least-once delivery, which is the foundation everything else rests on. They also create the duplicate-execution problem I'll get to.
+
+## Failure classification lives next to the domain
+
+The first thing application-level dead-lettering bought: the decision about whether a failure is terminal gets made in Python, next to the code that knows what the failure means.
+
+\`\`\`python
+# src/worker/tasks/base.py
+class TransientError(Exception):
+    """Retriable error (network issues, upstream 5xx, timeouts)."""
+    pass
+
+
+class PermanentError(Exception):
+    """Non-retriable error (validation failures, 4xx from upstream)."""
+    pass
+\`\`\`
+
+That taxonomy drives the retry policy declaratively:
+
+\`\`\`python
+class BaseTask(celery.Task):
     autoretry_for = (TransientError,)
-    retry_backoff = True          # exponential: 1s, 2s, 4s, ...
-    retry_backoff_max = 60        # cap at 60s
-    retry_jitter = True           # randomize to avoid thundering herd
-    max_retries = 3
-    acks_late = True              # critical: ack only after success
-    reject_on_worker_lost = True  # so a worker crash doesn't ack the message
-
-@shared_task(base=DeadLetterAware, bind=True)
-def transform_image(self, image_id: str, idempotency_key: str) -> None:
-    if seen_recently(idempotency_key):
-        return  # already processed; safely skip
-    mark_seen(idempotency_key)
-    try:
-        do_the_work(image_id)
-    except TransientError:
-        raise  # autoretry will catch this
-    except PermanentError:
-        # Don't retry. Reject without requeue → RabbitMQ routes to DLX.
-        self.update_state(state="DEAD_LETTERED")
-        raise Reject(requeue=False)
+    retry_backoff = True
+    retry_backoff_max = settings.retry_backoff_max
+    retry_jitter = True
+    max_retries = settings.default_max_retries
 \`\`\`
 
-Two settings that matter more than the rest:
-
-- **\`acks_late = True\`**. By default, Celery acks the message *before* the task runs. If the worker dies mid-task, the message is gone. With \`acks_late\`, the ack happens only on success; a worker crash leaves the message in the broker for another worker to pick up.
-- **\`reject_on_worker_lost = True\`**. If a worker is killed (OOM, SIGKILL), the unacked message stays in the broker. Combined with \`acks_late\`, this means SIGKILL doesn't drop work.
-
-## The idempotency layer
-
-\`acks_late\` introduces a new problem: if a task finishes its side effects but the worker dies before acking, the message will be re-delivered. The same job runs twice.
-
-For some jobs that's fine (set a row to \`status=processed\` — idempotent by construction). For others it's catastrophic (charge a credit card twice).
-
-The fix is an idempotency key, checked in Redis with a TTL longer than the longest retry window:
+And the failure hook decides terminality:
 
 \`\`\`python
-# idempotency.py
-import redis
+def on_failure(self, exc, task_id, args, kwargs, einfo):
+    job_id = kwargs.get("job_id")
+    # ...
+    with SyncSessionFactory() as session:
+        job = session.get(Job, uuid.UUID(job_id))
+        # ...
+        if isinstance(exc, PermanentError) or job.retry_count >= job.max_retries:
+            # Move to DLQ
+            job.status = JobStatus.DEAD_LETTERED.value
+            session.add(JobLog(
+                job_id=job.id, event="dead_lettered",
+                detail={"error": str(exc)[:500], "retries_exhausted": job.retry_count},
+            ))
+            jobs_dead_lettered_total.labels(job_type=job.job_type).inc()
 
-r = redis.Redis()
-KEY_TTL_SECONDS = 24 * 60 * 60  # 24 hours
-
-def seen_recently(key: str) -> bool:
-    """Return True if this idempotency key has already been processed.
-    Uses SET NX (atomic 'set if not exists') to avoid race conditions
-    between two workers grabbing the same message simultaneously."""
-    return r.set(
-        name=f"idem:{key}",
-        value="1",
-        nx=True,           # only set if not exists
-        ex=KEY_TTL_SECONDS,
-    ) is None
-
-def mark_seen(key: str) -> None:
-    r.set(f"idem:{key}", "1", ex=KEY_TTL_SECONDS)
+            # Publish to DLQ for monitoring
+            from src.worker.celery_app import celery_app
+            celery_app.send_task(
+                "src.worker.tasks.base.handle_dead_letter",
+                kwargs={"job_id": job_id, "error": str(exc)[:500]},
+                queue="dlq",
+            )
+        else:
+            job.status = JobStatus.FAILED.value
+            # ...
+        session.commit()
 \`\`\`
 
-The producer generates the idempotency key (usually \`uuid4()\` per intended-action, not per-message). The same intended action repeated by retries shares a key; legit-different actions get different keys.
+Two conditions dead-letter a job: a \`PermanentError\`, or exhausted retries. With DLX the classification still lives in your code — you're the one calling \`basic_reject\` — but the *consequence* lives in broker configuration, split across a queue argument and an exchange binding. When someone asks "what happens to a job that fails validation," I answer by pointing at one function. In the DLX version I'd point at a function, plus a topology declaration, plus whatever set the queue arguments at deploy time.
 
-Under load this measurably eliminates duplicate execution. I tested by killing worker processes with \`kill -9\` mid-task in a tight loop while a producer hammered the queue. Without idempotency keys: ~3% of jobs ran twice. With keys: zero duplicates across 10K messages.
+That's not a dramatic win. It's a small one that repeats every time somebody new reads the code.
 
-## What the DLQ buys you operationally
+## The DLQ is a SQL table
 
-Once dead-lettered messages are showing up in \`jobs.dlq\`, you can build the operational layer:
+This is the one that changed how I operate the system.
 
-**Alerting.** Prometheus scrapes the queue length:
+With DLX, inspecting the dead-letter queue means consuming from it. You pull messages, look at them, and put them back — and putting them back is fiddly, because a consumed-but-unacked message isn't visible to other consumers, and an acked one is gone. Filtering is worse. RabbitMQ queues are FIFO, not indexed. "Show me every dead-lettered image job from the last hour" is not a question a queue answers; it's a script that drains, filters in memory, and republishes what it didn't want.
+
+Because my terminal state is a row, that question is a query. The repository takes a status filter, and the API exposes it:
+
+\`\`\`python
+# src/api/routers/jobs.py
+@router.get("", response_model=PaginatedJobsResponse)
+async def list_jobs(
+    client_id: str | None = Query(None),
+    status: str | None = Query(None),
+    job_type: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    service: JobService = Depends(get_job_service),
+):
+\`\`\`
+
+So the DLQ is a URL:
+
+\`\`\`
+GET /api/v1/jobs?status=dead_lettered&job_type=image_processing&page=1
+\`\`\`
+
+Paginated, filterable, ordered newest-first, with a total count — and inspecting it can't mutate it. On top of that, every state transition writes a \`JobLog\` row, so a dead-lettered job isn't just a payload and a reason. It's a payload, a reason, and an ordered history: created, started, retried, retried, dead_lettered. An \`x-death\` header gives you a count and a timestamp. A log table gives you the sequence.
+
+## Replay is an HTTP call, not a republish loop
+
+Same argument, different verb. Broker-level replay means consuming from the DLQ and republishing to the original exchange, and you own the correctness of that loop — right routing key, preserved headers, no lost messages if the script dies halfway through.
+
+Because the job is a row, replay is a state transition plus a fresh dispatch:
+
+\`\`\`python
+# src/services/job_service.py
+async def retry_job(self, job_id: uuid.UUID) -> Job | None:
+    """Manually retry a dead-lettered job."""
+    job = await self.repo.get_by_id(job_id)
+    if not job or job.status != JobStatus.DEAD_LETTERED.value:
+        return None
+
+    job.retry_count = 0
+    job.error_message = None
+
+    from src.worker.celery_app import dispatch_job
+
+    queue = PRIORITY_QUEUE_MAP.get(job.priority, "default")
+    celery_task_id = dispatch_job(
+        job_id=str(job.id), job_type=job.job_type,
+        payload=job.payload, queue=queue, priority=job.priority,
+    )
+    await self.repo.update_status(
+        job.id, JobStatus.QUEUED, celery_task_id=celery_task_id
+    )
+\`\`\`
+
+Exposed as \`POST /api/v1/jobs/{job_id}/retry\`, which refuses anything not already dead-lettered:
+
+\`\`\`python
+# src/api/routers/jobs.py
+@router.post("/{job_id}/retry", response_model=JobResponse)
+async def retry_job(job_id: uuid.UUID, service: JobService = Depends(get_job_service)):
+    job = await service.retry_job(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found or not in dead_lettered status",
+        )
+\`\`\`
+
+Retrying one job is one call. Retrying a hundred is a loop over a query result — and it's the same query you just used to decide which hundred.
+
+There's a trade-off nested inside this one. Replay re-dispatches through \`dispatch_job\`, which mints a **new** Celery task ID against the same job row. That's the behavior I want: the job's identity is the row, not the message, so its history survives across replays. But it also means the original message is genuinely gone from the broker by then. There is no broker-side copy to fall back on if my Postgres write was wrong.
+
+## What I gave up
+
+Here is the honest cost, and it's the strongest case for the design I didn't pick.
+
+**DLX works when my application doesn't.** RabbitMQ's dead-lettering is executed by the broker. It does not care whether my worker code is correct, whether Postgres is reachable, or whether my process is running at all. Message rejected or expired, broker routes it. That's a durability guarantee living outside my code.
+
+Mine isn't. Every path to \`dead_lettered\` runs through \`on_failure\`, in my worker, which opens a Postgres session to record the outcome:
+
+\`\`\`python
+with SyncSessionFactory() as session:
+    job = session.get(Job, uuid.UUID(job_id))
+    if not job:
+        return
+\`\`\`
+
+If that write fails — pool exhausted, database failing over, network partition — the job does not get marked dead-lettered. The exception surfaces inside a Celery failure handler and the job is left in whatever state it held, usually \`running\`. It isn't lost: \`acks_late\` means RabbitMQ still holds the message unacknowledged, so it gets redelivered. But my system's own record of the failure is missing, \`jobs_dead_lettered_total\` never increments, and the alert that should have fired doesn't. I traded a broker guarantee for an application guarantee, and my application has strictly more ways to fail than the broker does.
+
+There's a second, quieter cost. With DLX the dead-letter path is declarative — it lives in the queue definition, visible to anyone who inspects the broker. Mine is imperative and only visible by reading Python. An operator who knows RabbitMQ but not my codebase can debug a DLX setup from the management UI. They cannot debug mine.
+
+If I were running this somewhere a database outage and a message flood could plausibly coincide, I'd reach for DLX — or for both, with the broker as backstop and the application as the queryable index. For this workload, a SQL-queryable DLQ was worth more than a durability edge case. That's a judgment about my failure modes, not a general claim that one design wins.
+
+## Duplicate execution, and the gate that stops it
+
+\`acks_late\` is what makes the dead-letter path reliable. It's also what creates the next problem. If a worker finishes a job's side effects and dies before acknowledging, RabbitMQ redelivers. The same job runs twice.
+
+The naive fix — mark the job as seen *before* doing the work — is worse than the disease. Mark it, crash mid-task, and the redelivery sees the mark and skips. The job silently never completes. That converts at-least-once delivery into at-most-once **with silent loss**, which is precisely the failure dead-lettering exists to prevent.
+
+So the commit point has to come *after* the work, and the gate has to check for completion rather than attendance:
+
+\`\`\`python
+def before_start(self, task_id, args, kwargs):
+    job_id = kwargs.get("job_id")
+    # ...
+    with SyncSessionFactory() as session:
+        job = session.get(Job, uuid.UUID(job_id))
+        # ...
+        # Idempotency: skip if already completed
+        if job.status == JobStatus.COMPLETED.value:
+            logger.info("job_already_completed", job_id=job_id)
+            raise celery.exceptions.Ignore()
+
+        job.status = JobStatus.RUNNING.value
+        job.started_at = datetime.now(timezone.utc)
+        # ...
+        session.commit()
+\`\`\`
+
+\`before_start\` runs ahead of the task body and skips only if the job is already \`completed\`. Anything else — \`queued\`, \`running\`, \`failed\` — falls through and executes. The terminal write happens in \`on_success\`, which Celery calls after the body returns:
+
+\`\`\`python
+def on_success(self, retval, task_id, args, kwargs):
+    job_id = kwargs.get("job_id")
+    # ...
+    with SyncSessionFactory() as session:
+        job = session.get(Job, uuid.UUID(job_id))
+        # ...
+        job.status = JobStatus.COMPLETED.value
+        job.result = retval if isinstance(retval, dict) else {"result": str(retval)}
+        job.completed_at = now
+        # ...
+        session.commit()
+\`\`\`
+
+Two states doing two different jobs. \`running\` is a **claim**: it records that someone started, and it deliberately does not block a retry. \`completed\` is a **commitment**: written only after the work is done, and the only state that suppresses re-execution. A worker killed mid-task leaves \`running\`, the message is redelivered, the gate lets it through, the job runs again. Duplicated, not dropped — and for this system that's the correct direction to err.
+
+A separate mechanism handles a different problem one layer up: duplicate *submissions*. Clients may send an idempotency key, and the job table constrains it:
+
+\`\`\`python
+# src/domain/models.py
+__table_args__ = (
+    UniqueConstraint("idempotency_key", name="uq_jobs_idempotency_key"),
+    # ...
+)
+\`\`\`
+
+\`\`\`python
+# src/services/job_service.py — inside create_job
+if idempotency_key:
+    existing_job = await self.repo.get_by_idempotency_key(idempotency_key)
+    if existing_job:
+        logger.info("idempotency_hit", key=idempotency_key, job_id=str(existing_job.id))
+        return existing_job, False
+\`\`\`
+
+Which is why the create endpoint returns \`201\` for a new job and \`200\` for an idempotent duplicate — the caller can tell which happened. Worth being clear that this is a different guarantee from the execution gate: it deduplicates submissions, not runs.
+
+## What the test shows, and what it doesn't
+
+I measured this by killing workers with \`kill -9\` in a tight loop while a producer saturated the queue: zero duplicate executions across 10K jobs.
+
+I want to be precise about what that establishes, because it's a duplicate-counting harness and there are two things it cannot see.
+
+**It cannot detect a dropped job.** A harness that counts how many jobs ran more than once reads a job that ran *zero* times as a success. "Zero duplicates" and "nothing was lost" are different claims, and this test supports only the first. Confirming the second means counting completions against submissions, which I haven't done. Given the design — the gate skips only on \`completed\`, so an incomplete job stays eligible — I expect no loss. Expecting is not measuring.
+
+**It cannot close the window it was built to narrow.** The gate shrinks the duplicate-execution window from "the whole task duration" to "the interval between the task body returning and \`on_success\` committing \`completed\`." That interval is short. It is not zero. A worker killed inside it leaves \`running\`, the message is redelivered, and the job runs a second time with its side effects already applied once. This is at-least-once execution with a narrow window, not exactly-once, and no amount of tightening makes it exactly-once. That would require the side effect and the marker to commit in the same transaction — and \`on_success\` opens its own session, separate from whatever the task body did.
+
+Two further limits, stated rather than left to be found:
+
+- **There is no mutual exclusion on \`running\`.** The gate skips only on \`completed\`, so if a redelivery arrives while a worker is still alive and processing, the second worker sees \`running\`, falls through, and executes concurrently. Nothing holds a lock. That's a deliberate bias toward at-least-once, but "two workers never process the same job simultaneously" is not a guarantee this system makes.
+- **\`on_failure\` writes in its own session too**, so the dead-letter record carries the same commit-window exposure as the completion record.
+
+## What does *not* get dead-lettered
+
+The temptation with any dead-letter mechanism is to send everything to it. Then the DLQ becomes a landfill, the alert becomes noise, and you stop looking. The line I drew lives in one branch:
+
+\`\`\`python
+if isinstance(exc, PermanentError) or job.retry_count >= job.max_retries:
+    job.status = JobStatus.DEAD_LETTERED.value
+    # ...
+else:
+    job.status = JobStatus.FAILED.value
+\`\`\`
+
+Two states for two different meanings, and the distinction is the whole discipline:
+
+- **\`failed\` means "this attempt didn't work and another one is coming."** A \`TransientError\` — upstream 5xx, a timeout, a connection reset — lands here. It's a waypoint, not a destination. Celery's \`autoretry_for\` will pick it up, \`on_retry\` will bump the retry count, and the job goes around again. Alerting on \`failed\` would page you for every blip on a flaky upstream.
+- **\`dead_lettered\` means "no future attempt will help."** Only two things reach it: a \`PermanentError\`, or a job that has genuinely run out of retries. Both are terminal. Both deserve a human.
+
+That gives me a rule of thumb I can apply without thinking: **the dead-letter state is for jobs that should have succeeded and didn't.** If retrying it later might work, it's \`failed\` and the retry machinery owns it. If retrying it later is *meaningless*, it doesn't belong in either state — it belongs in an outcome record.
+
+That last category is the one worth being explicit about, because it's where DLQs usually rot:
+
+- **Malformed payloads.** A job whose payload can't be deserialized will never succeed, no matter how many times you replay it. Raising \`PermanentError\` does keep it out of the retry loop — correct — but it still lands in \`dead_lettered\` alongside genuine incidents, and replaying it is guaranteed to fail again. My schema layer rejects bad shapes at submission with a 4xx, before a job row exists, which is the right place for it. What survives validation and still fails to deserialize is a bug in my code, not an operational event.
+- **Failures that are the correct answer.** A webhook target that returns a durable 404 hasn't malfunctioned; it has told you something true. That's an outcome to record against the job, not an incident to page on.
+- **Work that stopped mattering.** The user cancelled, or the entity was deleted while the job sat in the queue. Retrying is meaningless and dead-lettering is misleading. Drop it explicitly, with a structured log line saying why.
+
+The cost of getting this wrong isn't a broken system — everything still runs. The cost is that \`HighDLQDepth\` fires for a reason nobody needs to act on, and three weeks later it's a rule people mute. An alert you've muted is worse than an alert you never wrote, because you think you have coverage.
+
+## The observability that makes it operable
+
+A dead-letter path nobody watches is the same as no dead-letter path. Because dead-lettering is application code here, the metrics come from the same place as the decision:
+
+\`\`\`python
+# src/infra/prometheus.py
+job_retries_total = Counter(
+    "job_retries_total", "Total job retries", ["job_type"],
+)
+
+jobs_dead_lettered_total = Counter(
+    "jobs_dead_lettered_total", "Total jobs moved to DLQ", ["job_type"],
+)
+\`\`\`
+
+\`on_failure\` increments the dead-letter counter on its terminal branch and \`on_retry\` increments the retry counter, so both are written by the code that made the call rather than inferred from broker state. The alerts sit on those series:
 
 \`\`\`yaml
-# alerts.yaml
-groups:
-  - name: task_queue
-    rules:
-      - alert: DeadLetterQueueGrowing
-        expr: rabbitmq_queue_messages{queue="jobs.dlq"} > 50
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "DLQ has {{ $value }} stuck messages"
+# monitoring/alerting_rules.yml
+- alert: HighDLQDepth
+  expr: jobs_dead_lettered_total > 10
+  for: 5m
+  labels:
+    severity: critical
+
+- alert: HighRetryRate
+  expr: rate(job_retries_total[5m]) > 1
+  for: 10m
+  labels:
+    severity: warning
 \`\`\`
 
-**Inspection.** A simple admin script that consumes from the DLQ without acking, prints the payload + the \`x-death\` header (which RabbitMQ adds automatically — tells you which queue, when, and why):
+And a real flaw in what I shipped, worth naming because it's a direct consequence of the design choice: \`jobs_dead_lettered_total\` is a **counter**, so it only goes up. \`HighDLQDepth\` firing on \`jobs_dead_lettered_total > 10\` triggers once the process has ever dead-lettered eleven jobs and then stays firing forever. It measures cumulative dead-letters since worker start, not current backlog — which is not what the alert name promises. With DLX I'd have had \`rabbitmq_queue_messages\` for free, and that's a gauge that goes down when you drain. Getting an honest depth signal here means either a rate window over the counter or a periodic \`count(*) WHERE status = 'dead_lettered'\`. Losing a free gauge is a genuine ergonomic cost of moving the DLQ out of the broker, and it's still on my list.
+
+The dedicated \`dlq\` queue does get used — not by RabbitMQ, but by \`on_failure\` forwarding a summary to a handler that owns notification:
 
 \`\`\`python
-# scripts/inspect_dlq.py
-def inspect_dlq(channel, n=10):
-    for _ in range(n):
-        method, props, body = channel.basic_get("jobs.dlq", auto_ack=False)
-        if not method:
-            break
-        x_death = props.headers.get("x-death", []) if props.headers else []
-        print({
-            "delivery_tag": method.delivery_tag,
-            "body": body.decode(),
-            "failed_at": x_death[0].get("time") if x_death else None,
-            "retry_count": x_death[0].get("count") if x_death else 0,
-            "reason": x_death[0].get("reason") if x_death else "unknown",
-        })
-        channel.basic_nack(method.delivery_tag, requeue=True)  # leave in DLQ
+# src/worker/callbacks.py
+@celery_app.task(name="src.worker.tasks.base.handle_dead_letter", queue="dlq")
+def handle_dead_letter(*, job_id: str, error: str) -> dict:
+    """Process a dead-lettered job. This task runs on the DLQ and handles
+    alerting, logging, and optional notification delivery."""
+    logger.error("dead_letter_received", job_id=job_id, error=error)
+    # ...
 \`\`\`
-
-**Replay.** When the upstream issue is fixed, a "replay" script re-publishes DLQ messages back to the main exchange:
-
-\`\`\`python
-def replay_dlq(channel, max_messages=100):
-    for _ in range(max_messages):
-        method, props, body = channel.basic_get("jobs.dlq", auto_ack=False)
-        if not method:
-            break
-        channel.basic_publish(
-            exchange="jobs",
-            routing_key="jobs",
-            body=body,
-            properties=props,  # preserves idempotency key — no duplicate runs
-        )
-        channel.basic_ack(method.delivery_tag)
-\`\`\`
-
-Because the idempotency layer survives replays, you can safely replay the entire DLQ during incident recovery. Already-processed jobs will be no-ops.
-
-## What does NOT go in the DLQ
-
-The temptation is to send everything to the DLQ. Don't.
-
-- **Poison messages** (malformed JSON, schema-incompatible payload) — these will *never* succeed. Sending them to the DLQ pollutes it and creates false alert noise. Better: reject them at the producer with a 4xx, or route to a separate \`poison\` queue that doesn't trigger alerts.
-- **Expected-rare failures** (e.g. a webhook target returned 404). If it's an end-state, not a transient, write it to a dedicated outcome table instead.
-- **Anything where retry is meaningless** (the user cancelled the operation, the entity was deleted while the job was queued). Drop these explicitly with structured logging.
-
-The rule of thumb: the DLQ is for *jobs that should have succeeded but didn't*. If retrying it later wouldn't help, it doesn't belong there.
-
-## Observability is the whole point
-
-A DLQ that nobody monitors is the same as no DLQ. The full observability stack I deployed:
-
-- **Queue length metric** scraped every 15s, alerted on threshold.
-- **Per-task success/failure counter** as a Prometheus counter, broken down by task name and outcome.
-- **\`x-death\` header inspection** stored in structured logs (one log line per dead-lettered message) with a correlation ID that ties back to the original request.
-- **Grafana dashboard panel** for DLQ size over time, retry counts, and per-task failure rates.
-
-When recruiters ask "what does observability mean to you," I point at this dashboard. It's a real working surface, not a slide.
 
 ## Takeaways
 
-The interesting design decisions here are:
+1. **Dead-lettering is a decision about where terminal state lives**, not a feature you switch on. Broker or application — pick deliberately.
+2. **If your jobs are already rows, your DLQ is already a table.** Filtering, pagination, and audit history come free instead of being built on top of a FIFO queue.
+3. **The broker's advantage is that it works when you don't.** DLX executes outside your code. Application-level dead-lettering inherits every failure mode your application has, its database included.
+4. **The commit point goes after the work.** Marking a job before doing it converts crash recovery into silent loss.
+5. **Distinguish the claim from the commitment.** \`running\` must not suppress a retry; only \`completed\` may.
+6. **Be selective about what reaches the terminal state.** \`failed\` is a waypoint; \`dead_lettered\` is a destination. Conflating them turns your alert into noise, and a muted alert is worse than no alert.
+7. **Name your residual window.** \`acks_late\` plus a post-work marker gets you at-least-once with a short duplicate window — not exactly-once. Say so before someone asks.
 
-1. **Don't requeue on terminal failure.** Use \`Reject(requeue=False)\` so RabbitMQ routes to the DLX.
-2. **\`acks_late\` + \`reject_on_worker_lost\`** survives crashes without dropping work.
-3. **Idempotency keys are non-negotiable** once you have \`acks_late\` — re-delivery becomes a normal failure mode.
-4. **The DLQ is an interface to operations**, not a graveyard. Build alerting and replay tooling around it from day one.
-5. **Be selective.** Poison messages and end-state failures don't belong in the DLQ.
-
-This is the kind of architecture that doesn't show up on a system-design whiteboard but does show up in every Slack post-mortem at companies that ship reliably. It's worth the four hours to set up properly.
+The version of this post I didn't write is the one explaining \`x-dead-letter-exchange\`. That post exists, many times over, and it describes a fine pattern. This one is about the fork: the broker offered to handle my failures, and I said no on purpose, for reasons I can defend and at a cost I can name.
 
 ---
 
-*The full implementation lives in [malav-250/distributed-task-queue](https://github.com/malav-250/distributed-task-queue). The architecture diagram and decision log are on the [case study page](/projects/distributed-task-queue).*`,
+*The implementation is in [malav-250/distributed-task-queue](https://github.com/malav-250/distributed-task-queue) — failure hooks in \`src/worker/tasks/base.py\`, queue topology in \`src/worker/celery_app.py\`, replay path in \`src/services/job_service.py\`. Architecture and decision log on the [case study page](/projects/distributed-task-queue).*`,
   },
   {
     slug: "cost-of-three-azs",
@@ -446,6 +588,6 @@ The right answer is whichever one you can defend with numbers. Either is fine; t
 
 ---
 
-*The 3-AZ topology I built lives in [malav-250/cloud-tf-aws-infra](https://github.com/malav-250/cloud-tf-aws-infra) and is described in the [case study](/projects/cloud-native-app). Previous post: [Designing dead-letter routing for a distributed task queue](/blog/dead-letter-routing).*`,
+*The 3-AZ topology I built lives in [malav-250/cloud-tf-aws-infra](https://github.com/malav-250/cloud-tf-aws-infra) and is described in the [case study](/projects/cloud-native-app). Previous post: [Dead-lettering without a Dead Letter Exchange](/blog/dead-letter-routing).*`,
   },
 ];

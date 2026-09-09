@@ -108,11 +108,10 @@ export const projects: Project[] = [
     problem:
       "Async workloads like image processing and webhook delivery need reliable queue-based processing with retry logic, deduplication, and observability — without dropping messages under load.",
     solution:
-      "Built a FastAPI service backed by Celery workers and RabbitMQ with exponential-backoff retries and dead-letter routing for zero message loss. Added per-client sliding-window rate limiting, Redis-backed circuit breakers, and idempotency-key deduplication. Provisioned Prometheus + Grafana dashboards and structured JSON logging with correlation-ID tracing. Containerized 8 services via Docker Compose and codified AWS deployment (ECS Fargate, RDS, ElastiCache) with Terraform.",
+      "Built a FastAPI service backed by Celery workers and RabbitMQ with exponential-backoff retries and application-level dead-letter routing, so a terminal failure lands in an inspectable, replayable state instead of disappearing. Added per-client sliding-window rate limiting, Redis-backed circuit breakers, and Postgres-enforced idempotency-key deduplication. Provisioned Prometheus + Grafana dashboards and structured JSON logging with correlation-ID tracing. Containerized 8 services via Docker Compose and codified AWS deployment (ECS Fargate, RDS, ElastiCache) with Terraform.",
     impact: [
-      "Zero message loss across 10K+ queued jobs via dead-letter routing",
-      "100% duplicate elimination with idempotency-key deduplication",
-      "Sub-50ms API response latency under concurrent load",
+      "Every terminal failure recorded in an inspectable dead-letter state — no silent drops",
+      "Zero duplicate executions across 10K jobs under induced worker crashes",
       "8 containerized services with Prometheus/Grafana observability",
     ],
     techStack: [
@@ -137,35 +136,36 @@ export const projects: Project[] = [
       architecture: {
         diagram: `flowchart LR
     Client["FastAPI<br/>Producer"]
-    Idem[("Redis<br/>idempotency<br/>+ rate limit")]
+    RL[("Redis<br/>rate limit")]
     RMQ[["RabbitMQ<br/>main queue"]]
     Workers["Celery<br/>Workers"]
     DLQ[["Dead Letter<br/>Queue"]]
     CB[("Redis<br/>Circuit Breaker")]
-    DB[("PostgreSQL")]
+    DB[("PostgreSQL<br/>job state<br/>+ idempotency")]
     Prom["Prometheus"]
     Graf["Grafana"]
 
-    Client -->|"check key"| Idem
+    Client -->|"check limit"| RL
+    Client -->|"check idem key"| DB
     Client -->|"publish"| RMQ
     RMQ --> Workers
     Workers -->|"retry × 3<br/>exp backoff"| RMQ
-    Workers -->|"fail after 3"| DLQ
+    Workers -->|"terminal failure"| DLQ
     Workers -->|"upstream slow"| CB
-    Workers --> DB
+    Workers -->|"status transitions"| DB
     Workers -->|"metrics"| Prom
     Prom --> Graf`,
         caption:
-          "Producer dedupes via idempotency key, RabbitMQ retries with exponential backoff before falling to a DLQ, Redis-backed circuit breakers shed load when downstream APIs slow down.",
+          "The producer checks a Postgres-enforced idempotency key before publishing. RabbitMQ retries with exponential backoff; the worker's failure hook — not the broker — moves terminal failures to a DLQ and records the state transition in Postgres. Redis-backed circuit breakers shed load when downstream APIs slow down.",
       },
       decisions: [
         {
-          title: "Dead-letter routing instead of silent drops",
-          body: "Celery's default behavior after exhausted retries is to log and move on — messages disappear. I added an explicit dead-letter exchange in RabbitMQ so failed jobs land in a queue I can inspect, replay, or alert on. The DLQ has its own dashboard panel; if it grows, on-call gets paged.",
+          title: "Dead-lettering in the application, not the broker",
+          body: "RabbitMQ will dead-letter for you: set x-dead-letter-exchange on a queue and the broker routes rejected messages itself. I chose not to let it. Celery's failure hook classifies the exception, writes a dead_lettered status to Postgres, and forwards a summary to a dedicated queue. That makes the DLQ a SQL predicate rather than a FIFO queue — filterable, paginated, carrying per-attempt audit history, and replayable with a single HTTP call. The cost is real and I'd name it in an interview: broker-level dead-lettering keeps working when my application or my database is down, and mine does not.",
         },
         {
           title: "Idempotency keys, not natural-key dedup",
-          body: "Natural-key dedup (e.g. 'has this user_id+image_id been processed?') breaks down when retries cross worker boundaries. Clients pass an idempotency key on enqueue; Redis SETNX with a TTL gates duplicate enqueues. Survives worker crashes mid-task and broker restarts.",
+          body: "Natural-key dedup (e.g. 'has this user_id+image_id been processed?') breaks down when retries cross worker boundaries. Clients pass an idempotency key on enqueue and a uniqueness constraint on the jobs table enforces it, so a duplicate submission returns the original job with a 200 rather than creating a second one. Execution-level dedup is a separate mechanism: the worker skips a job only if it is already completed, and that status is written after the work finishes, never before — marking it first would turn a mid-task crash into silent loss.",
         },
         {
           title: "Circuit breakers in Redis, not in-process",
@@ -173,13 +173,13 @@ export const projects: Project[] = [
         },
         {
           title: "RabbitMQ over Kafka or SQS",
-          body: "Kafka's strengths (high-throughput log, replay) didn't match the workload — these are jobs, not events. SQS is fine but FIFO queue limits + no native DLQ pattern made it awkward. RabbitMQ gives me priority queues, native DLQ exchanges, and a well-understood operational model.",
+          body: "Kafka's strengths (high-throughput log, replay) didn't match the workload — these are jobs, not events. SQS is fine but FIFO queue limits made it awkward. RabbitMQ gives me per-queue priority support (x-max-priority), first-class Celery integration, and a well-understood operational model.",
         },
       ],
       outcomes: [
-        "Zero message loss across 10K+ test jobs — the DLQ caught every failure that would have been silent",
-        "100% duplicate elimination measured by reprocessing the same idempotency key across forced worker crashes",
-        "Sub-50ms p99 API latency under concurrent load (rate limiter short-circuits before queueing on overload)",
+        "Every terminal failure landed in an inspectable dead_lettered state — no failure exited the system unrecorded",
+        "Zero duplicate executions across 10K jobs with workers SIGKILL-ed mid-task",
+        "At-least-once execution with a narrow residual window, not exactly-once — the duplicate-counting harness cannot certify zero loss",
         "8 services orchestrated via Docker Compose; Terraform deploys the same topology to ECS Fargate",
       ],
       nextSteps: [

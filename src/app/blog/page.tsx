@@ -20,12 +20,15 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://malavgajera.is-a.dev/blog" },
 };
 
+// Locale and timeZone pinned for the same reason as in BlogPostView: an
+// `undefined` locale resolves per-runtime, so server and client disagreed.
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 

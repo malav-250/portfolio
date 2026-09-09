@@ -9,12 +9,18 @@ import rehypeHighlight from "rehype-highlight";
 import type { BlogPost } from "@/data/blog";
 import "highlight.js/styles/github-dark.css";
 
+// Locale and timeZone are pinned deliberately. `undefined` locale resolves to
+// the runtime's own locale, which differs between the Node server and the
+// browser — that mismatch caused a hydration error on every blog page. Pinning
+// timeZone to UTC also keeps the rendered date equal to the `publishedAt` ISO
+// date, which is parsed as UTC midnight.
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
