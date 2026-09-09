@@ -384,7 +384,7 @@ Nothing here is started. Post 2's defects (§5, above) come first next session.
 | 1 | **Privacy** | Truncate or hash IP, 90-day retention, publish `/privacy`, delete the Sept 9 probe row. See §2a. |
 | 2 | **ADMIN_SECRET out of the query string** | It's logged in Vercel access logs on every `/admin` load. Cookie path is half-built (the route already reads `admin_secret`); needs `HttpOnly; Secure; SameSite=Strict`, a constant-time compare, and a rate limit — `/api/admin/stats` is currently brute-forceable unthrottled. |
 | 3 | **Rate limits on four unthrottled write routes** | Only `/api/track` is limited (10/min/IP). `/api/page-view`, `/api/event`, `/api/session-end`, `/api/track-duration` have none. Mint session UUIDs at 10/min, then hammer `page-view` with unbounded distinct `path` values → unbounded row growth. Also cap `event.metadata` size (currently uncapped JSONB). |
-| 4 | **`ssl: { rejectUnauthorized: false }`** | `src/lib/db.ts:40`. Disables cert verification on the Postgres connection in production, so a MITM on that link goes undetected. Standard Neon/Supabase copy-paste, and exactly the line a backend reviewer circles. Analysed Sept 9, 2026 — the pool config overrides any `sslmode` in the connection string. |
+| 4 | **`ssl: { rejectUnauthorized: false }`** | `src/lib/db.ts:40`. Looks like it disables cert verification in production, but on `pg` 8.20.0 it is **probably dead code** — see §9. Resolve which branch applies before touching it. |
 | 5 | **9 npm audit vulnerabilities** | 3 moderate, 5 high, 1 critical. Own commit — it's a lockfile change. |
 | 6 | **`/api/track` hard-fails 500** | Should degrade quietly; it's non-essential tracking. Same fail-soft argument as the Upstash path in `src/lib/rateLimit.ts`. |
 | 7 | **README "110+ APIs shipped, 99.9% uptime"** | `malav-250/malav-250` README.md:22. Same unverified-claim class as the ones fixed in §4a. **Where did the uptime number come from?** Answer that before it stays up. |
@@ -508,6 +508,73 @@ npm ci && npm run build
 ```
 
 Expect a clean build with 18 pages prerendered.
+
+---
+
+## 9. The `pg` SSL question — analysed Sept 9, 2026, nothing changed
+
+`src/lib/db.ts` passes `connectionString` **and**, in production, `ssl: {
+rejectUnauthorized: false }`. Which wins is the opposite of what the code implies.
+
+**The connection string wins.** `pg/lib/connection-parameters.js:59-61`:
+
+```js
+// if the config has a connectionString defined, parse IT into the config we use
+// this will override other default values with what is stored in connectionString
+if (config.connectionString) {
+  config = Object.assign({}, config, parse(config.connectionString))
+}
+```
+
+`Object.assign` gives the later source precedence, so anything `parse()` produces
+overwrites what the caller passed. The docs say the same: *"If any of these
+options are used then the `ssl` object is replaced and any additional options
+provided there will be lost."*
+
+And `pg-connection-string/index.js:77-79` sets `config.ssl = {}` whenever the URL
+contains `sslcert`, `sslkey`, `sslrootcert`, **or `sslmode`**. So:
+
+- **If `DATABASE_URL` contains `?sslmode=...`** → parsed `ssl` replaces
+  `{ rejectUnauthorized: false }`. For `prefer` / `require` / `verify-ca` /
+  `verify-full`, the switch at `:132-152` leaves `ssl = {}` — no
+  `rejectUnauthorized` override — so Node's TLS defaults apply: verification and
+  hostname checking **ON**. The `db.ts` line is dead code and the connection is
+  *more* secure than it looks.
+- **If `DATABASE_URL` has no ssl params** → `parse()` returns no `ssl` key,
+  `Object.assign` doesn't clobber it, and `{ rejectUnauthorized: false }` applies.
+  Verification genuinely **OFF**.
+
+`.env.example` documents `?sslmode=require` for Neon, which suggests the first
+branch — but the real value is a Vercel env var and was not inspected.
+
+### What `sslmode=require` silently becomes
+
+On 8.20.0, without `uselibpqcompat`, `require` is an **alias for `verify-full`** —
+stricter than libpq, where `require` means encrypt-without-verify. The library
+warns about this (`pg-connection-string/index.js:216-223`):
+
+> SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated
+> as aliases for 'verify-full'. In the next major version (pg-connection-string
+> v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which
+> have weaker security guarantees.
+
+**This is a latent security downgrade on a future major bump.** Today
+`sslmode=require` verifies fully; under pg 9 it will silently stop verifying. The
+fix the library recommends is to write `sslmode=verify-full` explicitly, which
+pins current behavior across the upgrade.
+
+**Note there is no `pg` v9 today** — latest published is 8.23.0; this project is
+pinned at 8.20.0. The v9 reference comes from that warning, not from a release.
+
+### How to settle which branch is live
+
+Look in Vercel runtime logs for the `SECURITY WARNING` string above. Present →
+`DATABASE_URL` carries an `sslmode`, verification is on, `db.ts:40` is inert.
+Absent → no `sslmode`, and verification is off for real.
+
+Also worth knowing: outside production `config.ssl` is undefined, so
+`connection-parameters.js:85` falls back to `readSSLConfigFromEnvironment()` —
+`PGSSLMODE` / `PGSSLROOTCERT` can influence local behavior.
 
 ---
 
