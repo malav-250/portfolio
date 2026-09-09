@@ -4,13 +4,15 @@
 **Purpose of this doc:** full context transfer so a new Claude Code session can pick up
 without re-deriving anything. Read this first, then ask what to work on.
 
-**Last session ended:** Sept 9, 2026, at a clean stopping point. Last shipped
-commit is `7b0b3de`; the substantive work is `4fb6bec` — the dead-letter blog post
-rewritten to match the architecture it links to (§4a), plus the same corrections
-applied to `src/data/portfolio.ts`. Verified live on content, not status codes.
+**Last session ended:** Sept 9, 2026, at a clean stopping point. Both blog posts
+were audited and corrected — post 1 for fabricated mechanisms (§4a), post 2 for an
+inverted cross-AZ ratio and unverified prices (§4b). **§4c explains the shared
+pattern and is the most useful thing in this document.** All corrections verified
+live on content, not status codes.
 
-**Start here next session:** post 2's two open defects — the 1/N cross-AZ error
-and the six unverified AWS prices (§5). Both are live right now.
+**Start here next session:** the privacy work — IP truncation or hashing, 90-day
+retention, a `/privacy` page, and deleting the Sept 9 probe row (§2a, §5a item 1).
+Nothing on it is started.
 
 **Read before claiming anything shipped:** §6a. A successful `git push` does not
 mean deployed; the Vercel Git integration was silently disconnected for three
@@ -191,6 +193,35 @@ Corollary: the same standard applies to any stated fact — prices, versions, mo
 names, library APIs. Verify against a primary source in-session and provide the
 link. If it can't be verified, cut it rather than soften it.
 
+### Standing rule — sourced figures and verification dates
+
+**Every price, rate, or figure in a post must be traced to a primary source, and
+any post carrying prices must state a verification date in the body.** Not a
+footnote — in the body, next to the numbers, where a reader comparing them to
+their own bill will see it.
+
+- Primary source means AWS's own published data, not a blog or a summary. The
+  machine-readable feeds are the best option: the Price List API
+  (`https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<OFFER>/current/<region>/index.json`
+  or `index.csv`) and the AWS-hosted feeds the pricing pages render from
+  (`https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/...`). Both carry
+  publication dates. Rendered pricing pages are second-best — they often show
+  only worked examples for one region.
+- Region must be stated. us-east-1 unless the post says otherwise.
+- If a figure is an estimate rather than a published rate, **label it as one in
+  the text.** Post 2's CloudWatch allowance now reads "an estimate from my bills,
+  not a published price." One unsourced number wearing the same clothes as seven
+  sourced ones is what makes the whole set look invented.
+- Recompute every derived total after re-verifying. Show the arithmetic before
+  editing, and if a correction changes a conclusion, **say so** rather than
+  adjusting numbers until the original conclusion survives.
+
+**The measured decay rate: one of seven AWS prices moved in roughly fourteen
+months.** db.t3.micro went $0.017/hr → $0.018/hr between the post being written
+and Sept 9, 2026. That is the empirical reason posts carrying prices get dated —
+not a stylistic preference. At that rate a "current" bill is wrong within a year,
+and a dated snapshot ages honestly while an undated one silently rots.
+
 ---
 
 ## 4. Decisions already made — don't relitigate
@@ -312,6 +343,70 @@ profile repo. Note: `resume.pdf` was **not found** in a local clone of
 
 ---
 
+## 4b. Post 2 correction — Sept 9, 2026 (`6b88f74`)
+
+"The cost of three AZs" had two defects, both in the bill the post is built on.
+
+**The cross-AZ ratio was wrong.** The post claimed roughly 1/N of traffic crosses
+an AZ boundary. With cross-zone load balancing across N zones the ALB spreads
+requests over every registered target, so a request lands out-of-zone **(N−1)/N**
+of the time. At N=2 the stated 50% was accidentally correct — which is exactly why
+it survived review for four months. At N=3 the real figure is 67%, not 33%. The
+published $2 line item didn't follow from the stated model in either direction:
+under 1/N, three zones would have been *cheaper* than two, not double. Corrected
+to $1.33 vs $1.00, with the model written out.
+
+**One AWS price had moved.** db.t3.micro is $0.018/hr, not $0.017 — so Multi-AZ is
+$26.28/mo, not $24.82. AWS lists Multi-AZ at exactly 2× single-AZ, which
+independently confirms the post's methodology was sound.
+
+All seven rates re-verified against AWS primary sources on Sept 9, 2026. Six
+matched exactly: NAT Gateway hourly and per-GB ($0.045 both), t3.small ($0.0208),
+ALB hour ($0.0225), LCU ($0.008), inter-AZ transfer ($0.01/GB, billed **both**
+directions per the AWS CUR docs). An eighth figure not on the original list was
+also checked and corrected: interface VPC endpoints are $0.01/hr = $7.30/mo, not
+"$7."
+
+**The conclusion held.** ~$138/~$187/+$49 became ~$140/~$188/+$48; 35.45% became
+34.60%; both round to the ~35% the post claims. Isolating the fixes — ratio alone
+34.96%, price alone 35.08% — showed neither was load-bearing. Presenting that
+isolation table is what established the conclusion survived, rather than asserting
+it.
+
+One verification worth remembering: the data-transfer price list contains
+`USE1-DataTransfer-xAZ-In-Bytes` and `xAZ-Out-Bytes` at **$0.00/GB**, which looks
+like cross-AZ transfer having become free and would have zeroed the line item.
+It hasn't — those are artifacts of the April 2025 billing reorganization that
+split VPC-peering traffic into its own product family. $0.01/GB each way stands.
+Don't be fooled by it next time.
+
+---
+
+## 4c. Both posts have now been audited — this is the pattern
+
+| Post | Audited | What was wrong |
+|---|---|---|
+| 1 — dead-letter routing | Sept 9, 2026 (`4fb6bec`) | Fabricated mechanisms. Described a RabbitMQ DLX architecture the linked repo doesn't implement; every code block invented; the idempotency snippet inverted the real design into the exact failure it avoids. |
+| 2 — cost of three AZs | Sept 9, 2026 (`6b88f74`) | Unverified arithmetic and prices. Cross-AZ ratio inverted; seven prices with no in-page source; one had drifted. |
+
+**Both were written in sessions where the source of truth wasn't open.** Post 1 was
+written without `distributed-task-queue` cloned locally — so plausible-looking
+Celery/RabbitMQ code got written from general knowledge instead of from the repo.
+Post 2's prices were written without AWS's pricing data in front of the author —
+so figures that were roughly right at some past date got stated as current.
+
+Neither failure was carelessness about *writing*. Both were the same structural
+mistake: **producing specific technical claims without the artifact open.** The
+two standing rules in §3 exist to prevent exactly this, and they are cheap to
+follow — clone the repo, or pull the price list, *before* drafting. A session
+that can't do that shouldn't be writing the claim.
+
+Practical consequence for future posts: if a post will reference a repo, clone it
+into `.context/` first. If it will carry prices, pull the Price List API first.
+Cite file and line, or source and date, as you draft — not afterwards.
+
+---
+
 ## 5. Where things stand
 
 ### Shipped
@@ -340,24 +435,10 @@ profile repo. Note: `resume.pdf` was **not found** in a local clone of
 2. **"The cost of three AZs"** — June 8, 2026, ~1,900 words. 2-AZ vs 3-AZ AWS line
    items, the shared-NAT-vs-per-AZ trap, ~$138/mo vs ~$187/mo comparison, when each is
    the right call, hidden costs.
-   **TWO OPEN DEFECTS — next session starts here. Both live.**
-
-   a. **The 1/N cross-AZ error.** The "Cross-AZ data transfer" section says
-      "roughly 1/N of your traffic crosses an AZ boundary." It should be
-      **(N−1)/N** — with cross-zone balancing over N zones, a request lands on an
-      out-of-zone target N−1 times out of N. At N=2 the stated 50% is accidentally
-      right; at N=3 the true figure is ~67%, not 33%, so the $1→$2 line item moves
-      the wrong direction relative to the model. Immaterial to the ~$138/$187
-      totals (which do reconcile, and +35% is correct), but it's checkable
-      arithmetic three paragraphs above the summary table.
-
-   b. **Six unverified prices.** None are sourced in-page, in a post whose entire
-      credibility is the bill: NAT Gateway hourly ($0.045/hr) and per-GB
-      ($0.045/GB), t3.small ($0.0208/hr), ALB hourly ($0.0225/hr), LCU
-      (~$0.008/LCU-hr), db.t3.micro ($0.017/hr), inter-AZ transfer ($0.01/GB each
-      way). All were US-East-1 as of roughly mid-2025. Verify each against AWS's
-      official pricing pages, add an inline region + date-checked note, recompute
-      the totals if anything moved, and cut or soften anything unverifiable.
+   **Both defects CORRECTED Sept 9, 2026 (`6b88f74`) — see §4b.** Current
+   figures: ~$140 (2 AZ) vs ~$188 (3 AZ), +$48/mo (+35%), ~$580/year. Both price
+   tables carry "verified 9 September 2026" in the body. Don't refresh these
+   numbers without re-running the verification and re-dating them.
 
 ### Open — Phase 7 and beyond
 
@@ -484,11 +565,11 @@ Worth honoring — this came up repeatedly:
 ## 8. Suggested opening move for the new session
 
 ```
-Read CLAUDE.md, then src/data/blog.ts. The portfolio is at
+Read CLAUDE.md — §4c first, then §2a. The portfolio is at
 C:\Users\malav\Downloads\portfolio, live at malavgajera.is-a.dev.
 
-Post 2 has two open defects — the 1/N cross-AZ error and six unverified
-AWS prices. Fix those first. Confirm the repo is clean and on main.
+Both blog posts are audited and clean. Next up is the privacy work on
+the analytics layer. Confirm the repo is clean and on main.
 ```
 
 Sanity checks before any new work:
@@ -499,8 +580,9 @@ git -C "C:\Users\malav\Downloads\portfolio" log --oneline -5
 git -C "C:\Users\malav\Downloads\portfolio" config user.email
 ```
 
-Expect `7b0b3de` at top and `78475119+malav-250@users.noreply.github.com` for the
-email — **stop and say so if the email differs**, don't commit. Then, with Node on
+Expect a clean tree on `main`, and `78475119+malav-250@users.noreply.github.com`
+for the email — **stop and say so if the email differs**, don't commit. The most
+recent commits are listed at the bottom of this file. Then, with Node on
 PATH (§6a):
 
 ```bash
@@ -582,6 +664,9 @@ Also worth knowing: outside production `config.ssl` is undefined, so
 
 | Commit | What |
 |---|---|
+| `6b88f74` | Post 2 corrected — cross-AZ ratio (1/N → (N−1)/N), db.t3.micro price moved, totals refreshed and re-sourced against the AWS Price List API, both tables dated (see §4b) |
+| `376fbe6` | Corrected the pg SSL note in CLAUDE.md; added §9 analysis |
+| `642f2fe` | CLAUDE.md — analytics layer, greppability rule, deploy verification |
 | `7b0b3de` | Empty trigger commit — forced a build after the Vercel Git reconnect |
 | `4fb6bec` | Dead-letter post rewritten to match the shipped architecture; portfolio.ts claims corrected; blog date hydration bug fixed (see §4a) |
 | `bad2906` | CLAUDE.md tracked; `.gitignore` broadened `.env*.local` → `.env*` with `!.env.example`, and `.context/` ignored |
