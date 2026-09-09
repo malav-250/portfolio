@@ -26,7 +26,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env*.local
+# Ignore every .env variant; keep the checked-in template.
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -37,3 +39,5 @@ next-env.d.ts
 
 .vercel
 .claude/
+
+.context/
