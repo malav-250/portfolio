@@ -448,6 +448,8 @@ The app tier runs an Auto Scaling Group with one EC2 per AZ.
 |---|---|---|
 | t3.small | $0.0208 | **$15.18** |
 
+*All hourly rates in this post are AWS published on-demand rates for us-east-1, verified against the AWS Price List API on 9 September 2026.*
+
 - **2 AZ:** 2 × $15.18 = **$30.36/mo**
 - **3 AZ:** 3 × $15.18 = **$45.54/mo**
 - Difference: **+$15.18/mo** for the extra zone.
@@ -499,28 +501,34 @@ RDS Multi-AZ uses **two AZs**: a primary in one, a synchronous standby in anothe
 
 | Item | Cost |
 |---|---|
-| db.t3.micro single-AZ | $0.017/hr × 730 = $12.41/mo |
-| db.t3.micro Multi-AZ | 2× = **$24.82/mo** |
+| db.t3.micro single-AZ | $0.018/hr × 730 = $13.14/mo |
+| db.t3.micro Multi-AZ | 2× = **$26.28/mo** |
 
-- **2 AZ:** $24.82/mo
-- **3 AZ:** $24.82/mo
+- **2 AZ:** $26.28/mo
+- **3 AZ:** $26.28/mo
 - Difference: **$0**
+
+The 2× is not an approximation — AWS lists db.t3.micro Multi-AZ at exactly $0.036/hr against $0.018/hr single-AZ.
 
 (If you want database failover across three AZs you reach for Aurora, where Multi-AZ is more nuanced. Out of scope here.)
 
 ### Cross-AZ data transfer
 
-Inter-AZ traffic isn't free. The ALB routes requests to whichever AZ has a healthy instance, which means roughly 1/N of your traffic crosses an AZ boundary going in, and 1/N goes back out.
+Inter-AZ traffic isn't free, and the fraction of it that crosses a boundary is easy to get backwards. With cross-zone load balancing across N zones, the ALB spreads requests evenly over every registered target — so a request lands on a target in a *different* AZ **(N−1)/N** of the time, not 1/N. At two zones that's 50%. At three it's **67%**, not 33%.
 
 | Item | Cost |
 |---|---|
 | Inter-AZ traffic | $0.01/GB inbound + $0.01/GB outbound |
 
-For a portfolio-scale app pushing ~50GB/month between AZs:
+Both directions are metered: AWS bills a \`DataTransfer-Regional-Bytes\` line item for the send *and* the receive, so the effective rate is $0.02/GB of cross-zone traffic.
 
-- **2 AZ:** ~$1/mo
-- **3 AZ:** ~$2/mo
-- Difference: **+$1/mo**
+For a portfolio-scale app pushing ~100GB/month from the ALB to its targets:
+
+- **2 AZ:** 100GB × ½ × $0.02 = **~$1.00/mo**
+- **3 AZ:** 100GB × ⅔ × $0.02 = **~$1.33/mo**
+- Difference: **+$0.33/mo**
+
+Note which way that goes: three zones costs *more* here, not less, because a larger share of traffic crosses a boundary. Getting the ratio backwards inverts the sign of this line item — one reason I now write the fraction out rather than trusting my memory of it.
 
 Negligible for hobby traffic. Not negligible if you're moving terabytes — but if you're moving terabytes, your conversation is no longer "2 vs 3 AZs."
 
@@ -533,12 +541,14 @@ Putting it all together:
 | EC2 instances | $30.36 | $45.54 |
 | ALB | $16.43 | $16.43 |
 | NAT Gateways (one per AZ) | $65.70 | $98.55 |
-| RDS Multi-AZ (db.t3.micro) | $24.82 | $24.82 |
-| Cross-AZ data transfer | $1 | $2 |
-| **Total** | **~$138** | **~$187** |
-| **Difference** | — | **+$49/mo (+35%)** |
+| RDS Multi-AZ (db.t3.micro) | $26.28 | $26.28 |
+| Cross-AZ data transfer | $1.00 | $1.33 |
+| **Total** | **~$140** | **~$188** |
+| **Difference** | — | **+$48/mo (+35%)** |
 
-For a one-developer portfolio app, that's $588/year for one extra zone of resilience.
+*us-east-1, verified 9 September 2026.*
+
+For a one-developer portfolio app, that's about $580/year for one extra zone of resilience.
 For a 10× larger startup workload, multiply all line items proportionally — the difference scales close to linearly until the numbers get big enough that you reach for Reserved Instances or Savings Plans, which work in either configuration.
 
 ## When 2 AZs is the right call
@@ -550,7 +560,7 @@ Don't assume more is better. Two AZs is genuinely the right answer when:
 - You can absorb the failure with auto-scaling — if AZ-a goes down, the ASG can spin up extra instances in AZ-b to cover the load (assuming there's capacity available, which is itself not guaranteed during a regional event)
 - You're running a stateful workload where adding a third AZ creates more coordination overhead than it's worth
 
-If you're a solo founder or a student project, **start with 2 AZs**. Spend the saved $49/month on a domain, a logging service, or genuinely useful Cloudflare features. Move to 3 AZs when your uptime SLA actually demands it.
+If you're a solo founder or a student project, **start with 2 AZs**. Spend the saved $48/month on a domain, a logging service, or genuinely useful Cloudflare features. Move to 3 AZs when your uptime SLA actually demands it.
 
 ## When 3 AZs is the right call
 
@@ -559,14 +569,14 @@ The pattern flips when you have any of:
 - **A real SLA** (99.9% or higher) — math: an AZ failure consumes a significant slice of your annual error budget on 2-AZ; 3 AZs gives you headroom
 - **Stateful systems with quorum requirements** — etcd, ZooKeeper, Kafka, Cassandra — 3 AZs is the minimum for losing one zone without losing quorum
 - **Compliance-heavy workloads** (HIPAA, FedRAMP, PCI) — auditors specifically look for multi-AZ topology
-- **Stateless app tiers where the cost difference is < 5% of your total bill** — if you're already paying $5k/month for RDS, the extra $35 for a third NAT Gateway is not the conversation
+- **Stateless app tiers where the cost difference is < 5% of your total bill** — if you're already paying $5k/month for RDS, the extra $33 for a third NAT Gateway is not the conversation
 
 ## The hidden costs nobody mentions
 
 If you're building this from scratch, three more invisible costs to budget for:
 
-1. **CloudWatch logs and metrics** scale with the number of instances. Tripling app instances doesn't triple log costs if you're already at the free tier, but it does push you over the line sooner. Budget another $5-15/month at small scale.
-2. **VPC endpoints** (for S3, DynamoDB, etc.) are billed per AZ. If you've enabled gateway endpoints (free) you're fine. If you've enabled interface endpoints ($7/month per endpoint per AZ), each AZ counts separately.
+1. **CloudWatch logs and metrics** scale with the number of instances. Tripling app instances doesn't triple log costs if you're already at the free tier, but it does push you over the line sooner. Unlike every other figure in this post, I can't give you an AWS rate for this — it depends entirely on your log volume and retention. My own rough allowance at small scale is $5-15/month, which is an estimate from my bills, not a published price. Work it out from your own ingestion.
+2. **VPC endpoints** (for S3, DynamoDB, etc.) are billed per AZ. If you've enabled gateway endpoints (free) you're fine. If you've enabled interface endpoints ($0.01/hr, so $7.30/month per endpoint per AZ), each AZ counts separately.
 3. **Engineer time during AZ failover testing.** This is the cost nobody puts in their spreadsheet. The first AZ outage you experience teaches you whether your "multi-AZ" topology actually works. Budget half a day per quarter to terminate instances in one AZ and watch what breaks.
 
 ## The framing I use now
@@ -582,6 +592,8 @@ When I'm designing a new system, I ask three questions in order:
 - **The cost difference between 2 and 3 AZs is ~35% per month** for a small workload — driven mostly by NAT Gateways, not EC2 instances.
 - **The bill goes up roughly linearly with AZ count**, until you hit RI/Savings Plan territory.
 - **One shared NAT Gateway is a single point of failure** — if you're paying for "multi-AZ" but routing all egress through one NAT, you're paying for an illusion. Always one NAT per AZ in production.
+- **Cross-zone traffic is (N−1)/N of your requests, not 1/N.** More zones means a *larger* share crosses a boundary. Get it backwards and this line item moves the wrong direction.
+- **Date your prices.** AWS rates drift. When I re-verified this post against the AWS Price List API, db.t3.micro had gone from $0.017/hr to $0.018/hr since I first wrote it — which moved the Multi-AZ line from $24.82 to $26.28 and the monthly totals by about a dollar and a half. Not enough to change the conclusion; enough to make the bill wrong. A bill is a snapshot; say when you took it.
 - **Two AZs is honest engineering** for small workloads, students, and personal projects. Three AZs is honest engineering for anything with a real SLA.
 
 The right answer is whichever one you can defend with numbers. Either is fine; the wrong move is paying for three AZs and shipping the topology of one.
