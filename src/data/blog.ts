@@ -602,4 +602,172 @@ The right answer is whichever one you can defend with numbers. Either is fine; t
 
 *The 3-AZ topology I built lives in [malav-250/cloud-tf-aws-infra](https://github.com/malav-250/cloud-tf-aws-infra) and is described in the [case study](/projects/cloud-native-app). Previous post: [Dead-lettering without a Dead Letter Exchange](/blog/dead-letter-routing).*`,
   },
+  {
+    slug: "architectural-hallucination",
+    title: "When the code is real and the description isn't",
+    subtitle:
+      "I published a post explaining an architecture I hadn't built, linked to the repo that contradicts it, and nothing caught it for four months. Here's why nothing could.",
+    excerpt:
+      "Package hallucination fails closed — the import errors and you find out. I hit a different category: every component I named was real, the code I'd written was real, and the prose described a system I hadn't built. Two greps found it. Nothing else in the pipeline could have.",
+    publishedAt: "2026-09-18",
+    readingTime: "12 min read",
+    tags: ["Engineering Practice", "Verification", "AI-Assisted Development", "Postmortem"],
+    content: `\`\`\`bash
+$ grep -rn "x-dead-letter-exchange" src/
+$ grep -rn "pika" src/ requirements/
+$
+\`\`\`
+
+Two commands, no output.
+
+The post I was checking had been live on this site for four months. It explained, in some detail, how I'd used RabbitMQ's Dead Letter Exchange to route failed jobs in my task queue: the queue arguments that enable it, the \`x-death\` header RabbitMQ stamps on a dead-lettered message, a \`pika\` script that declared the topology at startup, an inspection loop built on \`basic_get\`. It linked to the repository at the bottom.
+
+The repository doesn't use a Dead Letter Exchange. It never did.
+
+The code was real. It ran, it passed its tests, it deployed, it processed jobs. What was wrong was the *description*. And I want to be precise about that category, because it isn't the one the literature covers.
+
+## 01 — What the post claimed, and what the repo does
+
+Every identifier the post named, checked against the repo it pointed readers to. The left column is a grep against the pre-rewrite post text, recovered from git rather than from memory; the right is a grep against \`src/\`, \`tests/\`, \`requirements/\` and \`monitoring/\` in the linked repo.
+
+| Identifier | Occurrences in the post | Occurrences in the repo |
+|---|---|---|
+| \`pika\` | 2 | **0** |
+| \`declare_topology\` | 1 | **0** |
+| \`x-dead-letter-exchange\` | 2 | **0** |
+| \`x-dead-letter-routing-key\` | 1 | **0** |
+| \`x-death\` | 3 | **0** |
+| \`inspect_dlq\` | 2 | **0** |
+| \`replay_dlq\` | 1 | **0** |
+| \`seen_recently\` | 2 | **0** |
+| \`mark_seen\` | 2 | **0** |
+| \`transform_image\` | 1 | **0** |
+| \`DeadLetterAware\` | 2 | **0** |
+| \`basic_get\` | 2 | **0** |
+| \`basic_nack\` | 1 | **0** |
+| \`rabbitmq_queue_messages\` | 1 | **0** |
+
+Fourteen identifiers. Zero hits. \`pika\` isn't a dependency of the project at all — the repo uses Celery and kombu.
+
+What the repo actually does is dead-letter in the application rather than the broker. A Celery failure hook classifies the exception, writes a terminal status to Postgres, increments a counter, and forwards a summary to a dedicated queue. The identifiers for *that* are all greppable: the failure hook, the completion hook, the six-state job enum with its \`DEAD_LETTERED\` member, the dead-letter counter, the queue's consumer task. The broker is never told that anything failed.
+
+So it isn't that I described a system vaguely and got details wrong. I described a **different, specific, coherent system** — one that a reasonable engineer might have built for this problem, that I did not build.
+
+## 02 — This is not the hallucination that gets written about
+
+Nearly all the published work on this concerns **things that don't exist**. The canonical study is Spracklen et al., a distinguished-paper winner at USENIX Security 2025: 16 models, 576,000 generated code samples across Python and JavaScript, which between them referenced about 2.23 million packages. Of those, 440,445 — **19.7%** — didn't exist, including 205,474 distinct fabricated package names.
+
+Two things about that number before I lean on it. First, the 19.7% is a share of *package references*, not of the 576,000 samples; those are different denominators and the distinction gets flattened constantly in secondary coverage. Second, and more importantly, the aggregate hides a wide split: the paper puts commercial models at 5.2% and open-source models at 21.7%. If you use a commercial assistant, 5.2% is your number, and citing 19.7% at you would overstate your exposure by about four times. I'm flagging that because quoting the headline figure alone would be technically accurate and materially misleading — which is one of the failure modes I get to later in this post, and it would be poor form to commit it on the way there.
+
+Now the difference that matters. A hallucinated package **fails closed**:
+
+\`\`\`
+$ pip install requsts
+ERROR: Could not find a version that satisfies the requirement requsts
+\`\`\`
+
+The runtime is the check. You find out in seconds, whether or not you were paying attention. The whole class is dangerous mainly because attackers can register the fabricated names — the failure itself is loud.
+
+Mine **failed open**. Every component I named was real. RabbitMQ genuinely has Dead Letter Exchanges. \`x-death\` is a real header with exactly the semantics I described. \`pika\` is a real, widely used library, and \`basic_get\` is a real method on its channel objects. Each sentence was true about RabbitMQ. The paragraph was false about *me*.
+
+There is no runtime for that. Nothing executes a blog post. The claim and the artifact live in different files, in different languages, in different repositories, and nothing in any toolchain relates one to the other.
+
+That's the category: **not a fabricated component, but a fabricated relationship between real components and a real artifact.** Referential hallucination has a natural enforcement mechanism. Descriptive hallucination has none.
+
+## 03 — Why every layer missed it
+
+This is the part I find genuinely interesting, because no layer failed through negligence. Each one was working correctly and was structurally incapable of catching this.
+
+**Type checkers and linters.** They operate on the syntax tree. My claims lived inside a template literal in \`src/data/blog.ts\` — a \`string\` in a typed array of post objects. To TypeScript, a fabricated paragraph and a true paragraph are the same type, the same shape, equally valid. The hallucination type-checked cleanly, because there is nothing about it that *is* a type error.
+
+**Tests.** Tests verify code against code. The linked repo has a test suite with unit coverage for idempotency, the rate limiter, the circuit breaker and the job service, plus integration tests for the retry-and-dead-letter path. Those tests exercise the real behavior. Not one of them has anything to say about a paragraph on a different site describing that behavior wrongly, because no assertion in any framework I know of takes a claim and an artifact and checks correspondence. That isn't a gap in coverage; it's outside what tests are.
+
+**CI.** CI built the site. The site built fine, because the site *was* fine. Adding a false sentence to a data file is, to every tool in the pipeline, indistinguishable from adding a true one. Both are valid TypeScript. Both prerender. Both ship.
+
+**AI review.** This is the trap, and it's worth being precise about why. Asking a model to review prose that a model produced doesn't give you an independent check — it gives you a second sample from a similar distribution. The text was generated because it was plausible; a reviewer asked "is this accurate?" without access to the repository can only assess plausibility again. It will approve, confidently, for exactly the reason the text exists. The requirement here is not a smarter reviewer. It's a reviewer with the artifact open. Independence, not capability.
+
+**Me.** This is the admission that matters, and it's the reason I think this is worth writing up rather than quietly fixing.
+
+I read that post. Not skimmed — read, more than once, before publishing and afterwards. It was coherent. It was technically correct about RabbitMQ. It matched my own mental model of what a good dead-letter-routing post contains, because it contained the things such a post contains. And I did not notice, for four months, that it described someone else's architecture.
+
+Broken code looks broken. It throws, it fails to compile, the indentation is wrong, the shape is off — you develop an eye for the silhouette of something wrong before you've read it. **Plausible prose has no such silhouette. It looks finished.** There is no visual signature for "this sentence is about a system you didn't build," because the sentence is well-formed, internally consistent, and externally accurate. It's wrong only *relative to an artifact that wasn't in front of me.*
+
+Reading more carefully would not have helped. That's the uncomfortable part. Careful reading is a check on coherence, and the text was coherent. The only thing that catches this is a mechanical comparison against the artifact, and I wasn't running one, because I didn't know it was a thing you were supposed to run.
+
+For what it's worth, the habit gap seems to be widespread rather than personal. New Relic's 2026 State of AI Coding report found that 62% of technology leaders say their teams ship AI-generated code without line-by-line manual verification, and 78% report more production incidents once it ships. That's a self-reported survey of 200 U.S. decision-makers, so treat it as evidence about perception and practice rather than a measurement of incident rates — but the shape matches: the verification step is the one being skipped, and people know they're skipping it.
+
+## 04 — The rule, and what it costs
+
+One rule, and it is not clever:
+
+> **Every identifier in a claim must be greppable in the artifact the claim describes.**
+
+If I write a function name, a setting, a header, a library, a class — it has to be findable in the thing I'm pointing at. Cite the file and line while drafting, not afterwards.
+
+The cost of running it on the post above was fourteen greps and well under a minute. That's the entire intervention. Four months of a false claim on the front of my portfolio, against about fifty seconds of shell.
+
+Why it works when careful reading didn't: it replaces a judgment with a lookup. "Is this accurate?" is a judgment, it requires a model of the system, and my model of the system was the thing that had drifted. "Does this string appear in this repository?" is a lookup. It has no opinion, it doesn't share the generator's assumptions, and it can't be talked into agreeing.
+
+The underrated half is that it works in the other direction too. Grepping for what the repo *does* contain handed me the post I should have written — the completion-gated status transition, the failure hook, the six-state enum, the counter that only goes up. The real design turned out to be more interesting than the fabricated one, because it had a real trade-off in it: dead-lettering in the application makes the queue a SQL table you can filter, and gives up the broker's guarantee that dead-lettering still happens when your application is down. The invented version had no trade-off, which in hindsight was the tell. Fabricated architectures tend to be suspiciously clean.
+
+And the rule's real form isn't the grep, it's the precondition: **if the artifact isn't open, the sentence doesn't get written.** The grep is just how you notice you broke that.
+
+## 05 — The second instance
+
+One case is an anecdote. I audited the other post on this site the same day, and it failed the same way in a different artifact class.
+
+That post prices out a two-AZ against a three-AZ AWS deployment. Two defects:
+
+**An inverted ratio.** It said roughly 1/N of traffic crosses an availability-zone boundary. With cross-zone load balancing over N zones, a request lands on an out-of-zone target **(N−1)/N** of the time. At two zones that's 50% — which is what 1/N also gives, so half the cases in the post were accidentally right, and that's precisely why it survived four months of me re-reading it. At three zones the real figure is 67%, not 33%. The published line item didn't follow from the post's own stated model in either direction.
+
+**Unsourced prices.** Seven AWS rates, none of them sourced in-page, in a post whose entire credibility is the bill. Re-checked against the AWS Price List API, six were still exact. One had drifted: \`db.t3.micro\` from $0.017/hr to $0.018/hr.
+
+Same root cause, different artifact. There's no repository to grep here, so the rule generalizes rather than transferring: every figure traces to a primary source, and a post carrying prices states its verification date in the body, next to the numbers, where someone comparing them to their own bill will see it.
+
+The arithmetic error is the more interesting variant, because there's no artifact at all — just a derivation. What caught it was recomputing rather than re-reading. Same principle: a mechanical check instead of a judgment.
+
+Worth being honest about the size of it. Correcting both moved the monthly totals by about two dollars and left the conclusion — three zones costs roughly 35% more — exactly intact. The errors were immaterial to the argument. I fixed them anyway, and not out of tidiness: a reader who spot-checks one number and finds it wrong has no reason to trust the other six. The credibility of a bill is not the average accuracy of its line items.
+
+## 06 — The part I'd rather not include
+
+The fabricated mechanism wasn't only in the blog post. The same claim had reached my portfolio case study and my résumé.
+
+Three artifacts, and the direction of the drift is the thing to notice: it was never toward claiming less. Each restatement had a little more room to round up, and took it. What the repo does is a status transition in a failure hook. The case study called it an explicit dead-letter exchange. Nothing in that chain pushed back.
+
+The mechanism is mundane once you see it. Each artifact was written from the previous artifact rather than from the source. The post fed the case study; the case study fed the résumé line. I was copying from a description of my work instead of from my work, three times, and a copy of a copy of a description drifts the way you'd expect — toward the version that reads best.
+
+So the root cause isn't really "hallucination," which puts it conveniently outside me. It's **producing specific technical claims without the source of truth open.** Post one was drafted without the repo cloned locally. Post two's prices were written without AWS's pricing data to hand. The case study and the résumé line were written from the post. In every case the input that would have caught the error simply wasn't in the room, and nothing in my process required it to be.
+
+That's a workflow defect, not a character defect, which is the only reason it's fixable.
+
+## 07 — What this doesn't solve
+
+Greppability catches fabricated identifiers. That's a narrow win and I'd rather define its edges than let it look like a general answer.
+
+**It doesn't catch a real identifier describing behavior it doesn't have.** If I write "\`task_acks_late\` guarantees exactly-once delivery," the grep succeeds — \`task_acks_late\` is right there in the Celery config — and the sentence is still false. The identifier exists; the claim about it doesn't. This is the failure mode grep is *weakest* against, and it's arguably the more dangerous one, because it passes the check and comes back with a file and a line number attached. A citation is evidence that a name exists, not that a sentence about it is true.
+
+**It doesn't catch prose that's true but misleading about scale or context.** Every word accurate, the impression wrong. There's an example inside this post: the 19.7% package-hallucination figure is real, sourced, and correctly quoted, and citing it alone would have overstated the risk from a commercial coding assistant by roughly four times. Greppability has nothing to say about that, because nothing is fabricated. Only reading the source with an eye for what it actually claims catches it.
+
+**It doesn't work on claims with no artifact.** Uptime, latency percentiles, "we saw a 40% reduction," "it handled 10,000 jobs." There's no string to grep, because the claim is about an event rather than a thing. The best substitute I've found is to state the measurement method next to the number, so a reader can judge what it supports — which is why the corrected dead-letter post now says its harness counted duplicate executions and therefore *cannot* certify that nothing was dropped. That's weaker than a grep. It's mostly just refusing to round an unmeasured thing up.
+
+**It doesn't work on systems I can't read.** A closed-source dependency, the internals of a managed service, a vendor's claim about their own product. The rule needs read access to the artifact. Where I don't have it, the most I can do is attribute and date the claim, and say plainly that it's an attribution rather than a verification.
+
+And the boundary that contains all of these: the rule checks **correspondence, not quality.** It would not have stopped me writing a well-sourced, fully greppable post about an architecture that was a bad idea. Every identifier would have checked out. Whether the design was any good is a separate question, and grep has no view on it.
+
+## Takeaways
+
+1. **Package hallucination fails closed; architectural hallucination fails open.** One is caught by the runtime. The other has no runtime, and therefore no check unless you build one.
+2. **Every verification layer we have compares code to code.** Type checkers, tests, CI — all of them. Nothing in a standard pipeline compares a *claim* to code.
+3. **A model reviewing generated prose isn't an independent check.** It shares the distribution that produced the text. The requirement is access to the artifact, not more capability.
+4. **Plausible prose has no silhouette.** Broken code looks broken; a false sentence looks finished. Careful reading checks coherence, and coherence was never the problem.
+5. **One rule: every identifier in a claim must be greppable in the artifact it describes.** Cite file and line as you draft. If the artifact isn't open, don't write the sentence.
+6. **Know the edge.** It catches invented names. It misses true names with false claims attached, accurate numbers that mislead about scale, claims with no artifact, and anything you can't read.
+7. **The root cause was a missing input, not a lapse in care.** Everything downstream followed from drafting without the source of truth open.
+
+The structural claim, and the only one I'd defend hard: **fluent text about an artifact is unverified by default.** We have decades of accumulated habit for checking code against code, and essentially none for checking claims against code. The second habit is far cheaper than the first. I just didn't have it, and for four months it cost me the front page of my own portfolio.
+
+---
+
+*The corrected post is [Dead-lettering without a Dead Letter Exchange](/blog/dead-letter-routing) — it now describes the architecture that exists, including what it gives up. The second instance is [The cost of three AZs](/blog/cost-of-three-azs). The repository under discussion throughout is [malav-250/distributed-task-queue](https://github.com/malav-250/distributed-task-queue); the dead-letter path is in \`src/worker/tasks/base.py\`.*`,
+  },
 ];
