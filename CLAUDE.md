@@ -4,15 +4,16 @@
 **Purpose of this doc:** full context transfer so a new Claude Code session can pick up
 without re-deriving anything. Read this first, then ask what to work on.
 
-**Last session ended:** Sept 9, 2026, at a clean stopping point. Both blog posts
-were audited and corrected — post 1 for fabricated mechanisms (§4a), post 2 for an
-inverted cross-AZ ratio and unverified prices (§4b). **§4c explains the shared
-pattern and is the most useful thing in this document.** All corrections verified
-live on content, not status codes.
+**Last session ended:** Sept 18, 2026, at a clean stopping point. Three posts are
+live. Posts 1 and 2 were audited and corrected on Sept 9 (§4a, §4b); post 3,
+shipped Sept 18, is the write-up of those corrections and the source of the two
+standing rules in §3. **§4c explains the shared pattern and is the most useful
+thing in this document.** All work verified live on content, not status codes.
 
-**Start here next session:** the privacy work — IP truncation or hashing, 90-day
-retention, a `/privacy` page, and deleting the Sept 9 probe row (§2a, §5a item 1).
-Nothing on it is started.
+**Start here next session:** the **résumé bullets** first (the corrected wording
+is in §4a, and post 3's §06 needs a concrete before/after once that lands), then
+the **privacy work** — IP truncation or hashing, 90-day retention, a `/privacy`
+page, and deleting the Sept 9 probe row (§2a, §5a item 1). Neither is started.
 
 **Read before claiming anything shipped:** §6a. A successful `git push` does not
 mean deployed; the Vercel Git integration was silently disconnected for three
@@ -85,7 +86,7 @@ Local working copy: `C:\Users\malav\Downloads\portfolio`
 /                       Home — hero, projects, skills, contact          (static)
 /projects/[slug]        Case studies — 8 prerendered paths              (SSG)
 /blog                   Blog index                                      (static)
-/blog/[slug]            Blog posts (2 live)                             (SSG)
+/blog/[slug]            Blog posts (3 live)                             (SSG)
 /admin                  Analytics dashboard — secret-gated              (static shell)
 /api/track              Session init — creates visitor + session rows   (dynamic)
 /api/page-view          Records/dedupes a page view                     (dynamic)
@@ -221,6 +222,32 @@ months.** db.t3.micro went $0.017/hr → $0.018/hr between the post being writte
 and Sept 9, 2026. That is the empirical reason posts carrying prices get dated —
 not a stylistic preference. At that rate a "current" bill is wrong within a year,
 and a dated snapshot ages honestly while an undated one silently rots.
+
+#### Worked example — the rule catching an error in a spec Malav wrote himself
+
+Drafting post 3 (Sept 18, 2026), the spec cited the USENIX Security 2025 package
+hallucination study as *"19.7% of recommended packages across 576,000 samples."*
+Going to the paper rather than the secondary summaries showed two problems:
+
+1. **Wrong denominator.** 19.7% is a share of the **2.23 million package
+   references** those samples produced, not of the 576,000 code samples. The
+   paper: *"These 30 tests generated a total of 2.23 million packages in response
+   to our prompts, of which 440,445 (19.7%) were determined to be
+   hallucinations, including 205,474 unique non-existent packages."* Most
+   secondary coverage flattens this.
+2. **The aggregate hides a 4× split.** The paper puts commercial models at
+   **5.2%** and open-source at **21.7%**. Quoting 19.7% at a reader who uses a
+   commercial assistant overstates their exposure roughly fourfold — accurate,
+   sourced, and materially misleading, which is one of the failure modes post 3's
+   own §07 names. The post therefore states both figures and uses the split as a
+   live example.
+
+Two lessons worth keeping. **The rule catches errors in Malav's own specs, not
+just in generated text** — the instruction to verify was itself the thing that
+found the mistake. And **secondary summaries are where denominators go to die**:
+every number in that spec traced back to real reporting, and the reporting had
+dropped the distinction. Go to the paper. If the PDF won't parse through a fetch
+tool, download it and inflate the text streams — that is how this one was read.
 
 ---
 
@@ -439,6 +466,36 @@ Cite file and line, or source and date, as you draft — not afterwards.
    figures: ~$140 (2 AZ) vs ~$188 (3 AZ), +$48/mo (+35%), ~$580/year. Both price
    tables carry "verified 9 September 2026" in the body. Don't refresh these
    numbers without re-running the verification and re-dating them.
+3. **"When the code is real and the description isn't"** — Sept 18, 2026, ~2,700
+   words of prose. Slug `architectural-hallucination`. Shipped `9fbec7d`.
+   **This post is the correction record for posts 1 and 2**, and the source of
+   the two standing rules in §3.
+
+   Argument: published work on AI code hallucination is almost entirely about
+   packages that don't exist, which **fail closed** — the runtime is the check.
+   Post 1 failed the other way. Every component it named was real, the linked
+   code was real and working, and the prose described an architecture that
+   wasn't built. Nothing executes a blog post, so nothing caught it.
+
+   Section 01 carries the real grep data — 14 identifiers from the pre-rewrite
+   post (recovered via `git show 4fb6bec^:src/data/blog.ts`, not from memory),
+   each with zero hits in the linked repo. Reproducible any time.
+   Section 03 works through why each layer was structurally incapable: type
+   checkers see a valid string literal; tests compare code to code; CI built a
+   site that was fine; an AI reviewer shares the generating distribution and so
+   approves its own hallucination. The load-bearing admission is the last one —
+   careful reading checks *coherence*, and the text was coherent. Broken code
+   looks broken; a false sentence looks finished.
+   Section 07 is deliberately unflattering to the rule and should stay that way.
+
+   **Known soft spot — §06.** It records that the fabricated mechanism had also
+   reached the portfolio case study and the résumé, and that all three drifted
+   the same direction (toward claiming more) because each was written from the
+   previous artifact rather than from the repo. It **asserts that drift without
+   showing it**, because the résumé was being revised separately and quoting it
+   was out of scope. Every other section has data behind it; this one has only
+   an argument. **Once the résumé revision lands, add one concrete before/after
+   to §06.** That closes the only gap a skeptical reader can push on.
 
 ### Open — Phase 7 and beyond
 
@@ -589,7 +646,8 @@ PATH (§6a):
 npm ci && npm run build
 ```
 
-Expect a clean build with 18 pages prerendered.
+Expect a clean build with **19** pages prerendered (18 before post 3 shipped —
+the count tracks the number of blog posts, so it grows by one per post).
 
 ---
 
@@ -664,6 +722,8 @@ Also worth knowing: outside production `config.ssl` is undefined, so
 
 | Commit | What |
 |---|---|
+| `9fbec7d` | Post 3 added — "When the code is real and the description isn't"; the correction record for posts 1 and 2 (see §5) |
+| `12bac15` | CLAUDE.md — sourced-figures rule, §4b post 2 correction, §4c the shared pattern |
 | `6b88f74` | Post 2 corrected — cross-AZ ratio (1/N → (N−1)/N), db.t3.micro price moved, totals refreshed and re-sourced against the AWS Price List API, both tables dated (see §4b) |
 | `376fbe6` | Corrected the pg SSL note in CLAUDE.md; added §9 analysis |
 | `642f2fe` | CLAUDE.md — analytics layer, greppability rule, deploy verification |
