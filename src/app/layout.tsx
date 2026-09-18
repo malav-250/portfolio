@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://malavgajera.is-a.dev"),
   title: "Malav Gajera | Backend & Cloud Engineer",
   description:
-    "Backend & Cloud Engineer. MS in Software Engineering @ Northeastern (3.9 GPA, Dec 2026). Software Engineer Co-op @ Crewasis. Open to full-time Jan 2027.",
+    "Backend & Cloud Engineer. MS in Software Engineering @ Northeastern (3.9 GPA, Dec 2026). Former Software Engineer Co-op @ Crewasis, New York. Open to full-time Jan 2027.",
   keywords: [
     "Malav Gajera",
     "Malav Gajera GitHub",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Malav Gajera | Backend & Cloud Engineer",
     description:
-      "MS @ Northeastern (3.9 GPA, Dec 2026). SWE Co-op @ Crewasis. Open to full-time Jan 2027.",
+      "MS @ Northeastern (3.9 GPA, Dec 2026). Former SWE Co-op @ Crewasis, New York. Open to full-time Jan 2027.",
     url: "https://malavgajera.is-a.dev",
     siteName: "Malav Gajera",
     type: "website",
@@ -45,7 +45,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Malav Gajera | Backend & Cloud Engineer",
-    description: "MS @ Northeastern · SWE Co-op @ Crewasis · Open Jan 2027",
+    description:
+      "MS @ Northeastern · Former SWE Co-op @ Crewasis · Open Jan 2027",
     images: ["/og/portfolio.png"],
   },
 };
@@ -58,16 +59,15 @@ const personSchema = {
   "@type": "Person",
   name: "Malav Gajera",
   alternateName: ["Malav Jigneshbhai Gajera"],
-  jobTitle: "Software Engineer Co-op",
+  jobTitle: "Backend & Cloud Engineer",
   description:
-    "Backend & Cloud Engineer. MS in Computer Software Engineering at Northeastern University, graduating December 2026. Open to full-time backend/cloud roles starting January 2027.",
+    "Backend & Cloud Engineer. MS in Computer Software Engineering at Northeastern University, graduating December 2026. Software Engineer Co-op at Crewasis, New York, January to May 2026. Open to full-time backend/cloud roles starting January 2027.",
   url: "https://malavgajera.is-a.dev",
   image: "https://malavgajera.is-a.dev/og/portfolio.png",
   email: "mailto:gajera.ma@northeastern.edu",
-  worksFor: {
-    "@type": "Organization",
-    name: "Crewasis",
-  },
+  // No `worksFor` — schema.org treats it as a current employer, and the
+  // Crewasis co-op concluded in May 2026. Past roles are described in
+  // `description` rather than asserted as present employment.
   alumniOf: [
     {
       "@type": "CollegeOrUniversity",

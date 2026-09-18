@@ -13,7 +13,7 @@ export const heroContent = {
   headline: "Backend & Cloud",
   headlineAccent: "Engineer",
   subheadline:
-    "MS in Software Engineering @ Northeastern (3.9 GPA), graduating Dec 2026. Building production APIs, cloud infrastructure, and CI/CD pipelines. Currently shipping backend systems at Crewasis.",
+    "MS in Software Engineering @ Northeastern (3.9 GPA), graduating Dec 2026. Building production APIs, cloud infrastructure, and CI/CD pipelines. Most recently a Software Engineer Co-op at Crewasis in New York.",
   stats: [
     { value: "3.9", label: "MS GPA — Northeastern" },
     { value: "Dec '26", label: "Graduating" },
@@ -23,7 +23,7 @@ export const heroContent = {
 
 export const aboutContent = {
   description:
-    "I'm a Master's student at Northeastern University finishing my MS in Software Engineering (3.9 GPA), graduating December 2026. Currently building production backend systems at Crewasis — writing Django APIs, optimizing PostgreSQL queries, provisioning AWS infrastructure, and shipping weekly. Previously built REST APIs in C#/ASP.NET Core at Tatvasoft. I focus on backend services, cloud infrastructure, and the CI/CD that ties them together.",
+    "I'm a Master's student at Northeastern University finishing my MS in Software Engineering (3.9 GPA), graduating December 2026. Most recently I spent five months in New York as a Software Engineer Co-op at Crewasis — writing Django APIs, optimizing PostgreSQL queries, provisioning AWS infrastructure, and shipping weekly. Before that, two internships at Tatvasoft in Ahmedabad building REST APIs in C#/ASP.NET Core, and nine months as a research assistant at Nirma University working on reinforcement learning and audio classification. I focus on backend services, cloud infrastructure, and the CI/CD that ties them together.",
   highlights: [
     {
       title: "Backend Services",
@@ -565,6 +565,65 @@ export const projects: Project[] = [
     github: "https://github.com/malav-250/Air-Chords",
     featured: false,
   },
+
+  // ── RESEARCH ────────────────────────────────────────────────────
+  // Carried out as a Research Assistant at Nirma University under
+  // Prof. Anuja Nair, Mar–Dec 2023. Neither project was published;
+  // these are research + implementation, not papers.
+  {
+    id: "lung-sound-detection",
+    title: "Lung Sound Disease Detection",
+    subtitle: "Attention over Pre-trained EfficientNet — ICBHI 2017",
+    description:
+      "Six-class respiratory disease classification from lung auscultation audio, using mel-spectrogram features and an EfficientNet-B0 backbone with an added attention mechanism.",
+    problem:
+      "Respiratory disease screening from auscultation depends on clinician experience and is hard to scale. The ICBHI 2017 dataset is the standard benchmark, and it is small, class-imbalanced, and recorded on mixed hardware — which makes it very easy to build a model that scores well and generalises badly.",
+    solution:
+      "Carried out as a Research Assistant at Nirma University under Prof. Anuja Nair, under the working title 'Lung Sound Disease Detection using Attention over Pre-trained EfficientNet Architecture'. Audio was bandpass-filtered with a Butterworth filter between 250Hz and 2000Hz to keep the range where adventitious sounds live, augmented by time stretching, pitch shifting and audio shifting, and converted to mel spectrograms. Classification across six classes — Healthy, COPD, URTI, LRTI, Bronchiectasis and Pneumonia — used EfficientNet-B0 pre-trained on ImageNet with an attention mechanism added over the feature maps.",
+    impact: [
+      "~92% accuracy on a cycle-level split — optimistic, and stated here with the protocol because the protocol is the reason it is high",
+      "ICBHI 2017 has 126 patients, so a cycle-level split places the same patient in train and test, and augmentation was applied before the split so augmented copies of one clip land on both sides",
+      "A patient-level split is the correct protocol for this dataset and would score lower — for scale, on the official patient-disjoint split Nguyen & Pernkopf report an ICBHI score of 58.29% on the four-class sound-event task",
+      "That is a different and harder task than six-class disease classification, so 92% isn't absurd — but the split, not the architecture, is what makes it high",
+    ],
+    techStack: [
+      "Python",
+      "PyTorch",
+      "EfficientNet-B0",
+      "Attention",
+      "Librosa",
+      "Mel Spectrograms",
+      "ICBHI 2017",
+    ],
+    categories: ["research", "ai"],
+    featured: false,
+    badge: "Research",
+  },
+  {
+    id: "vehicle-collision-avoidance",
+    title: "Autonomous Vehicle Collision Avoidance",
+    subtitle: "Reinforcement Learning in a SUMO Traffic Simulation",
+    description:
+      "A collision-avoidance policy for autonomous vehicles, trained with reinforcement learning inside a SUMO traffic simulation environment.",
+    problem:
+      "Collision-avoidance behaviour can't be learned safely on real roads, and hand-written rules struggle with the long tail of traffic situations. Training needs an environment that generates those situations repeatedly and cheaply.",
+    solution:
+      "Carried out as a Research Assistant at Nirma University under Prof. Anuja Nair. Built the traffic simulation environment in SUMO to generate the interaction scenarios, then trained a reinforcement-learning policy against it to produce the avoidance behaviour.",
+    impact: [
+      "Traffic simulation environment built in SUMO to generate collision scenarios repeatably",
+      "Collision-avoidance policy learned through reinforcement learning rather than hand-written rules",
+      "No benchmark figures are published here — the evaluation was in-simulation and I don't have a protocol I'd stand behind",
+    ],
+    techStack: [
+      "Python",
+      "SUMO",
+      "Reinforcement Learning",
+      "Traffic Simulation",
+    ],
+    categories: ["research", "ai"],
+    featured: false,
+    badge: "Research",
+  },
 ];
 
 export const projectCategories = [
@@ -573,6 +632,7 @@ export const projectCategories = [
   { id: "cloud", label: "Cloud & DevOps" },
   { id: "ai", label: "AI / ML" },
   { id: "fullstack", label: "Full Stack" },
+  { id: "research", label: "Research" },
 ];
 
 export interface SkillCategory {
@@ -659,57 +719,127 @@ export const skills: SkillCategory[] = [
   },
 ];
 
-export interface Experience {
-  company: string;
+export interface ExperienceRole {
   role: string;
-  location: string;
   period: string;
-  current: boolean;
+  // Explicit duration so a reader never has to do date arithmetic.
+  duration: string;
   achievements: string[];
   technologies: string[];
+  // Cross-links to related work on this site, the way the blog posts link
+  // to each other.
+  links?: { label: string; href: string }[];
 }
 
+export interface Experience {
+  company: string;
+  location: string;
+  // Country shown separately so the India -> United States progression is
+  // legible at a glance rather than inferred from city names.
+  region: string;
+  // Optional company-level note — e.g. that two separate stints happened.
+  note?: string;
+  roles: ExperienceRole[];
+}
+
+// Reverse-chronological. The progression (research -> industry in India ->
+// US co-op) is stated in the section header rather than by reordering,
+// because recruiters scan most-recent-first.
 export const experiences: Experience[] = [
   {
     company: "Crewasis",
-    role: "Software Engineer Co-op",
-    location: "New York, USA",
-    period: "Jan 2026 — Present",
-    current: true,
-    achievements: [
-      "Built and shipped 6 backend features in Django with 90%+ test coverage across weekly releases",
-      "Cut deployment time 40% by containerizing services with Docker and automating CI/CD via GitHub Actions",
-      "Reduced API latency 35% and database load 30% through PostgreSQL query optimization and Redis caching",
-      "Provisioned AWS infrastructure (EC2, RDS, S3, Lambda) serving 5K+ monthly active users",
-    ],
-    technologies: [
-      "Python",
-      "Django",
-      "AWS",
-      "Docker",
-      "PostgreSQL",
-      "Redis",
-      "GitHub Actions",
+    location: "New York, NY",
+    region: "United States",
+    roles: [
+      {
+        role: "Software Engineer Co-op",
+        period: "Jan 2026 — May 2026",
+        duration: "5 months",
+        achievements: [
+          "Shipped backend features in Django on a weekly release cadence, holding test coverage above 90% on the modules I wrote",
+          "Containerized the services with Docker and moved builds and deploys into GitHub Actions, replacing a manual release process",
+          "Cut p95 latency ~35% (measured in Django Debug Toolbar) and query volume ~30% (measured with pg_stat_statements) through PostgreSQL query-plan optimization and a Redis cache layer",
+          "Provisioned the AWS footprint the application runs on — EC2, RDS, S3 and Lambda",
+        ],
+        technologies: [
+          "Python",
+          "Django",
+          "AWS",
+          "Docker",
+          "PostgreSQL",
+          "Redis",
+          "GitHub Actions",
+        ],
+      },
     ],
   },
   {
     company: "Tatvasoft",
-    role: "Software Developer Intern",
     location: "Ahmedabad, India",
-    period: "Jan — May 2024",
-    current: false,
-    achievements: [
-      "Built RESTful APIs in C#/ASP.NET Core with Entity Framework, serving 100+ concurrent users at sub-500ms latency",
-      "Improved database query performance 30% through PostgreSQL indexing and query plan optimization",
-      "Set up CI/CD pipelines in Azure DevOps with xUnit integration tests, reducing production defects by 20%",
+    region: "India",
+    note: "Two separate internships — invited back for a second, longer stint the following year.",
+    roles: [
+      {
+        role: "Software Developer Intern",
+        period: "Jan 2024 — May 2024",
+        duration: "5 months",
+        achievements: [
+          "Built RESTful API endpoints in C#/ASP.NET Core with Entity Framework against an existing PostgreSQL schema, load-tested to a 100+ concurrent-user target at p95 under 500ms",
+          "Cut query time ~30% on the slowest endpoints through PostgreSQL indexing and query-plan analysis",
+          "Set up CI/CD in Azure DevOps, with xUnit integration tests running on every pipeline execution",
+        ],
+        technologies: [
+          "C#",
+          "ASP.NET Core",
+          "PostgreSQL",
+          "Azure DevOps",
+          "Entity Framework",
+          "xUnit",
+        ],
+      },
+      {
+        role: "Software Developer Intern",
+        period: "Jun 2023 — Aug 2023",
+        duration: "3 months",
+        achievements: [
+          "Built REST API endpoints for an MVC application",
+          "Implemented business-logic layers against the existing data-access code",
+        ],
+        technologies: ["C#", "ASP.NET MVC", "REST APIs"],
+      },
     ],
-    technologies: [
-      "C#",
-      "ASP.NET Core",
-      "PostgreSQL",
-      "Azure DevOps",
-      "Entity Framework",
-      "xUnit",
+  },
+  {
+    company: "Nirma University",
+    location: "Ahmedabad, India",
+    region: "India",
+    note: "Research assistant under Prof. Anuja Nair, across two projects.",
+    roles: [
+      {
+        role: "Research Assistant",
+        period: "Mar 2023 — Dec 2023",
+        duration: "9 months",
+        achievements: [
+          "Autonomous vehicle collision avoidance: built the traffic simulation environment in SUMO and trained a reinforcement-learning policy for the avoidance behaviour",
+          "Lung sound disease detection: six-class classification over the ICBHI 2017 respiratory sound dataset — Butterworth bandpass filtering at 250–2000 Hz, augmentation by time stretching, pitch shifting and audio shifting, mel-spectrogram features, and EfficientNet-B0 with an added attention mechanism",
+          "Reached ~92% accuracy on a cycle-level split, which I'd now call optimistic: ICBHI has 126 patients, so splitting at cycle level puts the same patient on both sides, and augmented copies of one clip land in train and test together. A patient-level split is the correct protocol for this dataset and would score lower",
+        ],
+        technologies: [
+          "Python",
+          "PyTorch",
+          "EfficientNet",
+          "SUMO",
+          "Reinforcement Learning",
+          "Librosa",
+        ],
+        links: [
+          { label: "Lung Sound Detection", href: "/projects/lung-sound-detection" },
+          {
+            label: "Collision Avoidance",
+            href: "/projects/vehicle-collision-avoidance",
+          },
+        ],
+      },
     ],
   },
 ];

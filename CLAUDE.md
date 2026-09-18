@@ -249,6 +249,95 @@ every number in that spec traced back to real reporting, and the reporting had
 dropped the distinction. Go to the paper. If the PDF won't parse through a fetch
 tool, download it and inflate the text streams — that is how this one was read.
 
+### Standing rule — a metric ships with its evaluation protocol, or not at all
+
+**No accuracy, score, or benchmark figure appears anywhere on this site without
+the evaluation protocol attached in the same sentence or bullet.** Not in a
+footnote, not on a detail page while the card shows the bare number. If the
+caveat won't fit, cut the number and describe the method instead.
+
+This is the third rule, alongside greppability and sourced figures, and it comes
+from the lung-sound work (Sept 18, 2026).
+
+The case: the model reached **~92% on a cycle-level split**, and that number is
+optimistic by an unknown margin for two compounding reasons.
+
+1. **ICBHI 2017 has 126 patients.** Splitting at *cycle* level puts the same
+   patient in train and test, so the model can learn the patient rather than the
+   pathology.
+2. **Augmentation was applied to the full dataset before splitting**, so
+   augmented copies of a single clip land on both sides.
+
+Either alone leaks; together they make the figure uninterpretable as a
+generalisation estimate. A **patient-level split** is the correct protocol for
+this dataset.
+
+A prior version of this claim on the site cited 99.72/99.82% accuracy. Those
+numbers came from a README that is **not Malav's** — disregard them entirely and
+never reintroduce them.
+
+**Also a worked example of why "for reference" figures need checking.** The brief
+supplied "~65%" as the state of the art on the ICBHI four-class task with the
+official patient-disjoint split. That did not survive verification. Nguyen &
+Pernkopf (*Lung Sound Classification Using Co-tuning and Stochastic
+Normalization*, arXiv 2108.01991) report, from the paper text: *"the highest
+ICBHI average score at 58.29% and 64.74% for the 4-class and 2-class ALSC task,
+respectively."* The ~65% is the **two-class** figure; four-class results on the
+official 60/40 split sit in the high 50s in that paper's comparison table, and
+every 4-class entry above 64% there uses 5-fold CV or an overlapping 80/20 split
+rather than the official one. A secondary summary did quote 64.92% for a 4-class
+model, untraceable to a paper.
+
+So the site now cites the figure it can source — 58.29%, attributed to Nguyen &
+Pernkopf — and does **not** call it "state of the art," because that is a claim
+about the whole field and ages badly. Task/split conflation is the specific trap
+with benchmark numbers: the same dataset supports several tasks and several
+splits, and a number quoted without both is close to meaningless.
+
+### The experience section is structurally outside greppability
+
+**Employment claims have no artifact to grep.** There is no repo behind a co-op.
+This is failure mode #3 from post 3 ("claims with no artifact") showing up in
+practice, and it means the greppability rule simply does not reach the experience
+section.
+
+The standard there is different and Malav set it: **"can I explain where this
+number came from," not "can a stranger reproduce it."** He was in the room; if he
+profiled the query and watched the number move, he can defend it in an interview,
+and that is the real test. So employment metrics are not held to the repo
+standard — they are held to the derivation standard.
+
+What that requires in practice: **every number carries its basis in the copy
+itself.** A percentile, a measurement tool, or the fact that it was a load test.
+"Cut p95 latency ~35% (measured in Django Debug Toolbar)" is defensible; a bare
+"35% faster" is not, because the second one gives an interviewer nothing to ask
+about and Malav nothing to answer with.
+
+#### Kept metrics and their derivations — Sept 18, 2026
+
+Settled directly with Malav. **Do not re-ask, and do not invent a basis for any
+of these.** A future session rewriting this copy should treat this table the way
+it treats the grep table in post 3's §01.
+
+| Metric | Derivation | Copy |
+|---|---|---|
+| Coverage >90% | Coverage of **the modules he wrote**, not the whole repo | "holding test coverage above 90% on the modules I wrote" |
+| p95 latency ~35% | **p95**, read from **Django Debug Toolbar** | "Cut p95 latency ~35% (measured in Django Debug Toolbar)" |
+| Query volume ~30% | **Query count**, from **pg_stat_statements** | "query volume ~30% (measured with pg_stat_statements)" |
+| 100+ concurrent users | A **load-test target**, not observed production traffic | "load-tested to a 100+ concurrent-user target" |
+| sub-500ms | **p95**, under **load testing** | "at p95 under 500ms" |
+| Query time ~30% (Tatvasoft) | Before/after from PostgreSQL query plans | "Cut query time ~30% … through PostgreSQL indexing and query-plan analysis" |
+
+#### Cut, and why — do not restore without new evidence
+
+| Metric | Why it was cut |
+|---|---|
+| "6 backend features" | True but self-harming — six over five months invites "only six?" Cut on judgment, not honesty. |
+| "40% deployment time" | **No before/after timings existed.** A felt improvement. Per Malav's own instruction, a number that can't be stated honestly gets cut rather than hedged into vagueness. The Docker + GitHub Actions substance stayed; the number went. |
+| "5K+ monthly active users" | A property of the product, not of his work, and not clearly his to publish. |
+| "Reduced production defects 20%" | The counterfactual isn't available to him over a five-month internship; attribution of the drop to his CI work specifically can't be defended. |
+| "sub-500ms" (bare, pre-Sept-18) | Was parked backlog item #8. Resolved by adding the percentile and the load-test basis. |
+
 ---
 
 ## 4. Decisions already made — don't relitigate
